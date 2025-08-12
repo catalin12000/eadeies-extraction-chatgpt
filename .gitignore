@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Environments
+.venv/
+.env
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Logs / temp
+*.log
+*.tmp
+
+# Debug & generated artifacts
+debug/
+!debug/README.md
+
+# Data (raw PDFs etc.)
+data/**
+!data/01_benchmark/
+!data/01_benchmark/*.csv
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Cache
+*.cache/
+.cache/
+
