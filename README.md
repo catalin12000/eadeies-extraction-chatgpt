@@ -22,6 +22,7 @@ Pipeline for comparing PDF permit extraction quality between `pdfplumber` and `d
 | `debug/structured_json/` | Structured JSON outputs. (Git-ignored) |
 | `debug/benchmark_side_by_side.xlsx` | Excel comparison report. |
 | `documentation/Extraction_Workflow.md` | Mermaid diagram of full extraction + evaluation workflow. |
+| `documentation/workflow.html` | Browser-rendered interactive workflow diagram (Mermaid). |
 
 ## 3. Installation
 ```bash

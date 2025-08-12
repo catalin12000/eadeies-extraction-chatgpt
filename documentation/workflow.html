@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Extraction & Evaluation Workflow</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<style>
+ body { font-family: system-ui, Arial, sans-serif; margin: 1.5rem; background:#f8fafc; color:#0f172a; }
+ h1 { margin-top:0; font-size:1.9rem; }
+ .container { max-width: 1400px; }
+ .panel { background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:1.2rem 1.4rem; box-shadow:0 2px 4px rgba(0,0,0,0.04); margin-bottom:1.2rem; }
+ code.inline { background:#e2e8f0; padding:2px 5px; border-radius:4px; font-size:0.9em; }
+ footer { margin-top:2rem; font-size:0.75rem; color:#64748b; }
+ .mermaid { background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:1rem; }
+ details summary { cursor:pointer; font-weight:600; }
+</style>
+<script type="module">
+ import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+ mermaid.initialize({ startOnLoad: true, theme: 'base', securityLevel: 'loose', themeVariables: {
+   primaryColor: '#eef2ff',
+   primaryBorderColor: '#4338ca',
+   primaryTextColor: '#312e81',
+   secondaryColor: '#ecfdf5',
+   secondaryBorderColor: '#059669',
+   tertiaryColor: '#fff7ed',
+   tertiaryBorderColor: '#c2410c'
+ }});
+</script>
+</head>
+<body>
+<div class="container">
+  <h1>Extraction & Evaluation Workflow</h1>
+  <p>An interactive diagram showing the end-to-end pipeline from raw PDF permits to structured JSON, metrics, and Excel reporting.</p>
+
+  <div class="panel">
+    <div class="mermaid">
+flowchart LR
+    classDef input fill:#f0f9ff,stroke:#0284c7,stroke-width:1px,color:#0c4a6e
+    classDef process fill:#eef2ff,stroke:#4338ca,stroke-width:1px,color:#312e81
+    classDef output fill:#ecfdf5,stroke:#059669,stroke-width:1px,color:#065f46
+    classDef store fill:#fff7ed,stroke:#c2410c,stroke-width:1px,color:#7c2d12
+    classDef warn fill:#fef2f2,stroke:#dc2626,color:#7f1d1d
+    classDef loop fill:#f5f3ff,stroke:#7e22ce,color:#581c87,stroke-dasharray: 5 3
+
+    PDFs[("PDF Permits\n(data/**)")]:::input
+    GT[("Ground Truth CSV\n(eadeies_final.csv)")]:::input
+
+    subgraph EX[1. Raw Text Extraction]
+      direction TB
+      COMP[compare_pdf_extractors.py]:::process
+      PDFs --> COMP
+      COMP --> PTXT["*_pdfplumber.txt"]:::store
+      COMP --> DTXT["*_docling.txt"]:::store
+      COMP --> CJSON["*_compare.json"]:::output
+      COMP --> AJSON["_aggregate_summary.json"]:::output
+      COMP --> DOCWARN["docling optional"]:::warn
+    end
+
+    subgraph ST[2. Structured Parsing]
+      direction TB
+      PARSE[build_structured_json.py]:::process
+      PTXT --> PARSE
+      DTXT --> PARSE
+      PARSE --> SJ1["<stem>_pdfplumber_structured.json"]:::store
+      PARSE --> SJ2["<stem>_docling_structured.json"]:::store
+    end
+
+    SJ1 --> SJDIR[("structured_json dir")]:::store
+    SJ2 --> SJDIR
+
+    subgraph EV[3. Benchmark Evaluation]
+      direction TB
+      EVAL[benchmark_evaluation.py]:::process
+      SJDIR --> EVAL
+      GT --> EVAL
+      EVAL --> BREPORT[benchmark_report.json]:::output
+    end
+
+    subgraph XL[4. Excel Reporting]
+      direction TB
+      EXCEL[build_excel_comparison.py]:::process
+      SJDIR --> EXCEL
+      GT --> EXCEL
+      EXCEL --> XLSX[benchmark_side_by_side.xlsx]:::output
+    end
+
+    subgraph FB[5. Iterative Refinement]
+      direction TB
+      INSIGHTS[Manual Review & Metrics]:::loop
+      HEUR[Heuristic Updates]:::process
+      TESTS[pytest tests]:::process
+      INSIGHTS --> HEUR --> TESTS --> PARSE
+    end
+
+    BREPORT --> INSIGHTS
+    XLSX --> INSIGHTS
+    CJSON --> INSIGHTS
+    AJSON --> INSIGHTS
+
+</div>
+  </div>
+
+  <div class="panel">
+    <h2>Legend</h2>
+    <ul>
+      <li><strong>Blue</strong>: Inputs</li>
+      <li><strong>Purple</strong>: Processing stage</li>
+      <li><strong>Beige</strong>: Stored intermediate artifact</li>
+      <li><strong>Green</strong>: Final output/report</li>
+      <li><strong>Dashed Lilac</strong>: Feedback / refinement loop</li>
+      <li><strong>Red</strong>: Optional / potential failure path</li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h2>Key Artifacts</h2>
+    <ul>
+      <li><code class="inline">*_pdfplumber.txt</code>, <code class="inline">*_docling.txt</code> – raw extracted text</li>
+      <li><code class="inline">*_compare.json</code> – per-file extraction stats & similarity</li>
+      <li><code class="inline">structured_json/*_structured.json</code> – canonical parsed output</li>
+      <li><code class="inline">benchmark_report.json</code> – quantitative evaluation</li>
+      <li><code class="inline">benchmark_side_by_side.xlsx</code> – visual QA & mismatches</li>
+    </ul>
+  </div>
+
+  <details class="panel"><summary><strong>Suggested Refinements</strong></summary>
+    <ul>
+      <li>Add sequence diagram for a single stem.</li>
+      <li>Embed miniature JSON schema snippet near parsing node.</li>
+      <li>Add toggle to show/hide optional docling path.</li>
+    </ul>
+  </details>
+
+  <footer>Generated diagram – customize theme via Mermaid config in the &lt;head&gt;.</footer>
+</div>
+</body>
+</html>
