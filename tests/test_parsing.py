@@ -1,4 +1,12 @@
 import math
+import sys
+from pathlib import Path
+
+# Ensure project root on path when running via pytest
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from build_structured_json import parse_eu_number, _post_process_kaek, orient_coverage, COVERAGE_KEYS
 from benchmark_evaluation import normalize_owner_component, equivalent_kaek
 
