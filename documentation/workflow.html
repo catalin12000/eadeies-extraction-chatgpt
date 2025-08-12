@@ -194,6 +194,81 @@ python build_structured_json.py --all --compare-dir debug/compare --out-dir debu
 python benchmark_evaluation.py --benchmark-csv data/01_benchmark/eadeies_final.csv --structured-dir debug/structured_json --out debug/benchmark_report.json
 python build_excel_comparison.py --benchmark-csv data/01_benchmark/eadeies_final.csv --structured-dir debug/structured_json --out debug/benchmark_side_by_side.xlsx</div>
     </details>
+
+    <section style="margin-top:2.2rem;">
+      <h2 style="font-size:1.15rem;margin:0 0 .8rem;">Common Error Fixes (Before ➜ After)</h2>
+      <div style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));">
+        <!-- KAEK Fragmented -->
+        <div class="step" style="min-height:0;padding:.9rem 1rem;">
+          <div class="step-number" style="background:#6366f1;">A</div>
+          <h3 style="margin:0 0 .4rem;font-size:.95rem;padding-left:1.7rem;">KAEK Fragmented Suffix</h3>
+          <div class="files" style="font-size:.68rem;">Raw Line:
+ΚΑΕΚ | 50097350003 / 0 /
+... later cell ... | ΚΑΕΚ 0
+
+Extracted (initial): 50097350003
+Heuristic merge: append '/0/0'
+Final: 50097350003/0/0</div>
+          <p style="font-size:.72rem;margin:.6rem 0 0;">Detection: scan for base number followed (same or nearby line) by pattern <code class="inline">/ 0 / 0</code>; if missing in stored value, append.</p>
+        </div>
+        <!-- KAEK Leading Zero -->
+        <div class="step" style="min-height:0;padding:.9rem 1rem;">
+          <div class="step-number" style="background:#6366f1;">B</div>
+            <h3 style="margin:0 0 .4rem;font-size:.95rem;padding-left:1.7rem;">KAEK Leading Zero Loss</h3>
+            <div class="files" style="font-size:.68rem;">Ground Truth: 050097350003
+Prediction: 50097350003
+Compare: equivalent_kaek() = True (allow single dropped leading '0')</div>
+            <p style="font-size:.72rem;margin:.6rem 0 0;">We do NOT mutate stored values; tolerance only in evaluation layer.</p>
+        </div>
+        <!-- EU Number Parsing -->
+        <div class="step" style="min-height:0;padding:.9rem 1rem;">
+          <div class="step-number" style="background:#6366f1;">C</div>
+          <h3 style="margin:0 0 .4rem;font-size:.95rem;padding-left:1.7rem;">EU Number Disambiguation</h3>
+          <div class="files" style="font-size:.68rem;">Inputs:
+"1.234,56" -> 1234.56
+"1.234"    -> 1234.0 (thousands)
+"7.5"      -> 7.5 (decimal)
+"-110,96"  -> -110.96</div>
+          <p style="font-size:.72rem;margin:.6rem 0 0;">Heuristic: comma implies decimal separator; dots w/ 3-digit groups => thousands; single dot + 1–2 digits => decimal.</p>
+        </div>
+        <!-- Negative Coverage Values -->
+        <div class="step" style="min-height:0;padding:.9rem 1rem;">
+          <div class="step-number" style="background:#6366f1;">D</div>
+          <h3 style="margin:0 0 .4rem;font-size:.95rem;padding-left:1.7rem;">Negative Coverage Preservation</h3>
+          <div class="files" style="font-size:.68rem;">Original token: -110,96
+Regex: -?[0-9][0-9\.,]*
+Parsed: -110.96 (float)</div>
+          <p style="font-size:.72rem;margin:.6rem 0 0;">Including optional leading minus avoids losing demolition deltas.</p>
+        </div>
+        <!-- Owner Normalization -->
+        <div class="step" style="min-height:0;padding:.9rem 1rem;">
+          <div class="step-number" style="background:#6366f1;">E</div>
+          <h3 style="margin:0 0 .4rem;font-size:.95rem;padding-left:1.7rem;">Owner Normalization</h3>
+          <div class="files" style="font-size:.68rem;">Raw: "Α.Ε. Παράδειγμα (REG CODE)"
+Strip accents -> remove corporate tokens -> uppercase
+Result: "ΠΑΡΑΔΕΙΓΜΑ"</div>
+          <p style="font-size:.72rem;margin:.6rem 0 0;">Ensures set comparison unaffected by punctuation / legal form.</p>
+        </div>
+        <!-- Coverage Orientation Fill -->
+        <div class="step" style="min-height:0;padding:.9rem 1rem;">
+          <div class="step-number" style="background:#6366f1;">F</div>
+          <h3 style="margin:0 0 .4rem;font-size:.95rem;padding-left:1.7rem;">Coverage Missing Cell Fill</h3>
+          <div class="files" style="font-size:.68rem;">Raw row values: [1.0, 2.0, None, 4.0]
+Orient -> group dict
+None -> 0.0 placeholder
+Used for MAE / exact checks</div>
+          <p style="font-size:.72rem;margin:.6rem 0 0;">Consistent numeric presence avoids key errors & simplifies loops.</p>
+        </div>
+        <!-- Ambiguous Decimal Flag -->
+        <div class="step" style="min-height:0;padding:.9rem 1rem;">
+          <div class="step-number" style="background:#6366f1;">G</div>
+          <h3 style="margin:0 0 .4rem;font-size:.95rem;padding-left:1.7rem;">Ambiguous Magnitude (Future)</h3>
+          <div class="files" style="font-size:.68rem;">Value: "1.834" -> 1834.0 currently
+Potential rule: if metric logically < 50 (e.g., height) treat as 1.834</div>
+          <p style="font-size:.72rem;margin:.6rem 0 0;">Planned enhancement: context-aware thresholds per metric.</p>
+        </div>
+      </div>
+    </section>
   </main>
   <footer>Simplified workflow view · Adjust visuals in documentation/workflow.html</footer>
 </body>
