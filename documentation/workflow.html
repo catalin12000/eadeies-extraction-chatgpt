@@ -59,6 +59,57 @@
     </div>
   </header>
   <main>
+    <!-- Static SVG overview (always visible even if CSS/JS blocked) -->
+    <section style="margin:0 0 1.8rem;">
+      <h2 style="margin:.2rem 0 .6rem;font-size:1.1rem;">High-Level Flow (Static SVG)</h2>
+      <div style="background:#fff;border:1px solid var(--border);border-radius:14px;padding:1rem;overflow:auto;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="980" height="140" role="img" aria-label="PDF to Reports pipeline" style="max-width:100%;height:auto;font-family:system-ui,Arial,sans-serif;">
+          <defs>
+            <style>
+              .blk{fill:#ffffff;stroke:#2563eb;stroke-width:1.5;rx:12;ry:12;}
+              .txt{font-size:13px;fill:#0f172a;font-weight:600;}
+              .sub{font-size:11px;fill:#475569;font-weight:400;}
+              .arrow{stroke:#1e293b;stroke-width:1.4;marker-end:url(#mArrow);} 
+            </style>
+            <marker id="mArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#1e293b" />
+            </marker>
+          </defs>
+          <!-- Blocks -->
+          <g transform="translate(10,20)">
+            <rect class="blk" width="130" height="90"/>
+            <text x="65" y="42" text-anchor="middle" class="txt">PDFs</text>
+            <text x="65" y="60" text-anchor="middle" class="sub">data/**</text>
+          </g>
+          <g transform="translate(170,20)">
+            <rect class="blk" width="170" height="90"/>
+            <text x="85" y="38" text-anchor="middle" class="txt">Extraction</text>
+            <text x="85" y="56" text-anchor="middle" class="sub">compare_pdf_extractors</text>
+          </g>
+          <g transform="translate(370,20)">
+            <rect class="blk" width="170" height="90"/>
+            <text x="85" y="32" text-anchor="middle" class="txt">Structured JSON</text>
+            <text x="85" y="50" text-anchor="middle" class="sub">build_structured_json</text>
+          </g>
+            <g transform="translate(570,20)">
+            <rect class="blk" width="150" height="90"/>
+            <text x="75" y="38" text-anchor="middle" class="txt">Benchmark</text>
+            <text x="75" y="56" text-anchor="middle" class="sub">benchmark_evaluation</text>
+          </g>
+          <g transform="translate(750,20)">
+            <rect class="blk" width="210" height="90"/>
+            <text x="105" y="32" text-anchor="middle" class="txt">Excel & Report</text>
+            <text x="105" y="50" text-anchor="middle" class="sub">build_excel_comparison</text>
+          </g>
+          <!-- Arrows -->
+          <line class="arrow" x1="140" y1="65" x2="170" y2="65"/>
+          <line class="arrow" x1="340" y1="65" x2="370" y2="65"/>
+          <line class="arrow" x1="540" y1="65" x2="570" y2="65"/>
+          <line class="arrow" x1="720" y1="65" x2="750" y2="65"/>
+        </svg>
+        <pre style="margin:1rem 0 0;font-size:.7rem;color:#475569;">PDFs -> Extraction -> Structured JSON -> Benchmark -> Excel & Report</pre>
+      </div>
+    </section>
     <div class="arrow-flow">
       <span>PDFs</span>
       <span>Extraction</span>
