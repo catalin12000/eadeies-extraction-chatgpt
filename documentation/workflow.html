@@ -1,138 +1,149 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Extraction & Evaluation Workflow</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<link rel="preconnect" href="https://cdn.jsdelivr.net" />
-<style>
- body { font-family: system-ui, Arial, sans-serif; margin: 1.5rem; background:#f8fafc; color:#0f172a; }
- h1 { margin-top:0; font-size:1.9rem; }
- .container { max-width: 1400px; }
- .panel { background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:1.2rem 1.4rem; box-shadow:0 2px 4px rgba(0,0,0,0.04); margin-bottom:1.2rem; }
- code.inline { background:#e2e8f0; padding:2px 5px; border-radius:4px; font-size:0.9em; }
- footer { margin-top:2rem; font-size:0.75rem; color:#64748b; }
- .mermaid { background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:1rem; }
- details summary { cursor:pointer; font-weight:600; }
-</style>
-<script type="module">
- import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
- mermaid.initialize({ startOnLoad: true, theme: 'base', securityLevel: 'loose', themeVariables: {
-   primaryColor: '#eef2ff',
-   primaryBorderColor: '#4338ca',
-   primaryTextColor: '#312e81',
-   secondaryColor: '#ecfdf5',
-   secondaryBorderColor: '#059669',
-   tertiaryColor: '#fff7ed',
-   tertiaryBorderColor: '#c2410c'
- }});
-</script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple Extraction Workflow</title>
+  <style>
+    :root {
+      --bg:#f8fafc; --panel:#ffffff; --border:#e2e8f0; --text:#0f172a;
+      --accent:#2563eb; --accent-bg:#eff6ff; --muted:#64748b; --good:#059669; --warn:#dc2626;
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, Arial, sans-serif; background:var(--bg); color:var(--text); line-height:1.35; }
+    header { padding:1.8rem 1.6rem 1rem; }
+    h1 { margin:0 0 .5rem; font-size:1.9rem; }
+    p.lead { margin:.2rem 0 1.2rem; font-size:1.05rem; color:var(--muted); }
+    main { max-width:1200px; margin:0 auto; padding:0 1.4rem 2.5rem; }
+    .grid { display:grid; gap:1.2rem; }
+    @media (min-width:900px){ .grid { grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); } }
+    .step { position:relative; background:var(--panel); border:1px solid var(--border); border-radius:18px; padding:1rem .95rem 1.1rem; box-shadow:0 4px 8px -4px rgba(15,23,42,0.06); display:flex; flex-direction:column; gap:.65rem; }
+    .step-number { position:absolute; top:-10px; left:-10px; background:var(--accent); color:#fff; width:38px; height:38px; border-radius:12px; font-weight:600; display:flex; align-items:center; justify-content:center; font-size:1rem; box-shadow:0 2px 4px rgba(0,0,0,0.15); }
+    .step h2 { font-size:1.05rem; margin:0; padding-left:1.8rem; line-height:1.2; }
+    ul.inline { list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:.4rem; }
+    .badge { font-size:.68rem; font-weight:600; letter-spacing:.5px; text-transform:uppercase; padding:.35rem .55rem; border-radius:6px; background:var(--accent-bg); color:var(--accent); border:1px solid #bfdbfe; }
+    .badge.out { background:#ecfdf5; border-color:#bbf7d0; color:var(--good); }
+    .badge.in { background:#f0f9ff; border-color:#bae6fd; color:#0369a1; }
+    .badge.mid { background:#fff7ed; border-color:#fed7aa; color:#c2410c; }
+    .files { font-size:.72rem; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; background:#f1f5f9; padding:.55rem .6rem; border-radius:8px; border:1px solid var(--border); line-height:1.25; white-space:pre-line; }
+    .arrow-flow { margin:1.4rem auto; max-width:880px; display:flex; flex-wrap:wrap; gap:.6rem; justify-content:center; font-size:.75rem; }
+    .arrow-flow span { background:#1e293b; color:#fff; padding:.5rem .8rem; border-radius:999px; font-weight:500; letter-spacing:.5px; position:relative; }
+    .arrow-flow span:after { content:""; position:absolute; right:-14px; top:50%; transform:translateY(-50%); border:7px solid transparent; border-left-color:#1e293b; }
+    .arrow-flow span:last-child:after { display:none; }
+    .legend { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.3rem; }
+    .legend-item { display:flex; align-items:center; gap:.35rem; font-size:.7rem; background:#fff; border:1px solid var(--border); padding:.35rem .55rem; border-radius:8px; }
+    .dot { width:12px; height:12px; border-radius:4px; }
+    .dot.in { background:#f0f9ff; border:1px solid #7dd3fc; }
+    .dot.proc { background:#eef2ff; border:1px solid #c7d2fe; }
+    .dot.out { background:#ecfdf5; border:1px solid #bbf7d0; }
+    .dot.mid { background:#fff7ed; border:1px solid #fed7aa; }
+    .dot.loop { background:#f5f3ff; border:1px solid #e9d5ff; }
+    .connect { margin:2.2rem 0 1.5rem; font-size:.8rem; text-align:center; color:var(--muted); }
+    .schema { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); margin-top:1rem; }
+    details { background:var(--panel); border:1px solid var(--border); padding:.9rem 1rem; border-radius:14px; }
+    details summary { cursor:pointer; font-weight:600; }
+    code.inline { background:#e2e8f0; padding:2px 6px; border-radius:4px; font-size:.8rem; }
+    footer { margin-top:3rem; padding:1.2rem 0 2rem; font-size:.65rem; text-align:center; color:var(--muted); }
+  </style>
 </head>
 <body>
-<div class="container">
-  <h1>Extraction & Evaluation Workflow</h1>
-  <p>An interactive diagram showing the end-to-end pipeline from raw PDF permits to structured JSON, metrics, and Excel reporting.</p>
+  <header>
+    <h1>Simple Extraction Workflow</h1>
+    <p class="lead">From PDF permit ➜ raw text ➜ structured JSON ➜ metrics & Excel ➜ iterative improvement.</p>
+    <div class="legend">
+      <div class="legend-item"><div class="dot in"></div> Input</div>
+      <div class="legend-item"><div class="dot proc"></div> Process</div>
+      <div class="legend-item"><div class="dot mid"></div> Intermediate Store</div>
+      <div class="legend-item"><div class="dot out"></div> Output</div>
+      <div class="legend-item"><div class="dot loop"></div> Improvement Loop</div>
+    </div>
+  </header>
+  <main>
+    <div class="arrow-flow">
+      <span>PDFs</span>
+      <span>Extraction</span>
+      <span>Structured JSON</span>
+      <span>Benchmark</span>
+      <span>Excel & Report</span>
+      <span>Refine</span>
+    </div>
 
-  <div class="panel">
-    <div class="mermaid">
-flowchart LR
-    classDef input fill:#f0f9ff,stroke:#0284c7,stroke-width:1px,color:#0c4a6e
-    classDef process fill:#eef2ff,stroke:#4338ca,stroke-width:1px,color:#312e81
-    classDef output fill:#ecfdf5,stroke:#059669,stroke-width:1px,color:#065f46
-    classDef store fill:#fff7ed,stroke:#c2410c,stroke-width:1px,color:#7c2d12
-    classDef warn fill:#fef2f2,stroke:#dc2626,color:#7f1d1d
-    classDef loop fill:#f5f3ff,stroke:#7e22ce,color:#581c87,stroke-dasharray: 5 3
+    <section class="grid" aria-label="Workflow Steps">
+      <div class="step" id="step1">
+        <div class="step-number">1</div>
+        <h2>Raw Text Extraction</h2>
+        <ul class="inline">
+          <li class="badge in">Input</li>
+          <li class="badge">Process</li>
+          <li class="badge out">Output</li>
+        </ul>
+        <p>Run <code class="inline">compare_pdf_extractors.py</code> across all PDFs (recursive). Generates paired raw text for two engines plus basic stats.</p>
+        <div class="files">Outputs:
+*_pdfplumber.txt
+*_docling.txt (optional)
+*_compare.json
+_aggregate_summary.json</div>
+      </div>
+      <div class="step" id="step2">
+        <div class="step-number">2</div>
+        <h2>Parsing to Structured JSON</h2>
+        <ul class="inline">
+          <li class="badge mid">Intermediate</li>
+          <li class="badge">Process</li>
+        </ul>
+        <p><code class="inline">build_structured_json.py</code> converts raw text → normalized schema (KAEK, Owners, Coverage 4×7). Heuristics fix fragmented codes & EU numbers.</p>
+        <div class="files">structured_json/
+<stem>_pdfplumber_structured.json
+<stem>_docling_structured.json</div>
+      </div>
+      <div class="step" id="step3">
+        <div class="step-number">3</div>
+        <h2>Benchmark Evaluation</h2>
+        <ul class="inline"><li class="badge">Process</li><li class="badge out">Output</li></ul>
+        <p><code class="inline">benchmark_evaluation.py</code> compares structured values vs ground-truth CSV computing KAEK match, owner precision / recall / F1, coverage exact ratio, MAE & RMSE.</p>
+        <div class="files">benchmark_report.json</div>
+      </div>
+      <div class="step" id="step4">
+        <div class="step-number">4</div>
+        <h2>Excel Comparison</h2>
+        <ul class="inline"><li class="badge">Process</li><li class="badge out">Output</li></ul>
+        <p><code class="inline">build_excel_comparison.py</code> creates review workbook with sheets for KAEK, Owners, Coverage (wide & mismatches).</p>
+        <div class="files">benchmark_side_by_side.xlsx</div>
+      </div>
+      <div class="step" id="step5">
+        <div class="step-number">5</div>
+        <h2>Iterative Refinement</h2>
+        <ul class="inline"><li class="badge">Process</li><li class="badge loop">Loop</li></ul>
+        <p>Review mismatches → adjust heuristics (<code class="inline">parse_eu_number</code>, KAEK suffix, owner parsing) → add / run tests → regenerate.</p>
+        <div class="files">tests/test_parsing.py<br/>EXTRACTION_LOGIC.md</div>
+      </div>
+    </section>
 
-    PDFs[("PDF Permits\n(data/**)")]:::input
-    GT[("Ground Truth CSV\n(eadeies_final.csv)")]:::input
+    <div class="connect">All steps can be re-run independently; only regenerate downstream artifacts after changing a stage.</div>
 
-    subgraph EX[1. Raw Text Extraction]
-      direction TB
-      COMP[compare_pdf_extractors.py]:::process
-      PDFs --> COMP
-      COMP --> PTXT["*_pdfplumber.txt"]:::store
-      COMP --> DTXT["*_docling.txt"]:::store
-      COMP --> CJSON["*_compare.json"]:::output
-      COMP --> AJSON["_aggregate_summary.json"]:::output
-      COMP --> DOCWARN["docling optional"]:::warn
-    end
+    <details>
+      <summary>JSON Schema (Simplified)</summary>
+      <div class="files">{
+  "ΑΔΑ": "...",
+  "ΚΑΕΚ": "50097350003/0/0",
+  "Στοιχεία κυρίου του έργου": [ { "Επώνυμο/ία": "...", "Όνομα": "...", "Ποσοστό": 50.0 } ],
+  "Στοιχεία Διαγράμματος Κάλυψης": {
+    "ΥΦΙΣΤΑΜΕΝΑ": { "Εμβ. κάλυψης κτιρίου": 123.45, ... },
+    "ΝΟΜΙΜΟΠΟΙΟΥΜΕΝΑ": { ... },
+    "ΠΡΑΓΜΑΤΟΠΟΙΟΥΜΕΝΑ": { ... },
+    "ΣΥΝΟΛΟ": { ... }
+  }
+}</div>
+    </details>
 
-    subgraph ST[2. Structured Parsing]
-      direction TB
-      PARSE[build_structured_json.py]:::process
-      PTXT --> PARSE
-      DTXT --> PARSE
-      PARSE --> SJ1["<stem>_pdfplumber_structured.json"]:::store
-      PARSE --> SJ2["<stem>_docling_structured.json"]:::store
-    end
-
-    SJ1 --> SJDIR[("structured_json dir")]:::store
-    SJ2 --> SJDIR
-
-    subgraph EV[3. Benchmark Evaluation]
-      direction TB
-      EVAL[benchmark_evaluation.py]:::process
-      SJDIR --> EVAL
-      GT --> EVAL
-      EVAL --> BREPORT[benchmark_report.json]:::output
-    end
-
-    subgraph XL[4. Excel Reporting]
-      direction TB
-      EXCEL[build_excel_comparison.py]:::process
-      SJDIR --> EXCEL
-      GT --> EXCEL
-      EXCEL --> XLSX[benchmark_side_by_side.xlsx]:::output
-    end
-
-    subgraph FB[5. Iterative Refinement]
-      direction TB
-      INSIGHTS[Manual Review & Metrics]:::loop
-      HEUR[Heuristic Updates]:::process
-      TESTS[pytest tests]:::process
-      INSIGHTS --> HEUR --> TESTS --> PARSE
-    end
-
-    BREPORT --> INSIGHTS
-    XLSX --> INSIGHTS
-    CJSON --> INSIGHTS
-    AJSON --> INSIGHTS
-
-</div>
-  </div>
-
-  <div class="panel">
-    <h2>Legend</h2>
-    <ul>
-      <li><strong>Blue</strong>: Inputs</li>
-      <li><strong>Purple</strong>: Processing stage</li>
-      <li><strong>Beige</strong>: Stored intermediate artifact</li>
-      <li><strong>Green</strong>: Final output/report</li>
-      <li><strong>Dashed Lilac</strong>: Feedback / refinement loop</li>
-      <li><strong>Red</strong>: Optional / potential failure path</li>
-    </ul>
-  </div>
-
-  <div class="panel">
-    <h2>Key Artifacts</h2>
-    <ul>
-      <li><code class="inline">*_pdfplumber.txt</code>, <code class="inline">*_docling.txt</code> – raw extracted text</li>
-      <li><code class="inline">*_compare.json</code> – per-file extraction stats & similarity</li>
-      <li><code class="inline">structured_json/*_structured.json</code> – canonical parsed output</li>
-      <li><code class="inline">benchmark_report.json</code> – quantitative evaluation</li>
-      <li><code class="inline">benchmark_side_by_side.xlsx</code> – visual QA & mismatches</li>
-    </ul>
-  </div>
-
-  <details class="panel"><summary><strong>Suggested Refinements</strong></summary>
-    <ul>
-      <li>Add sequence diagram for a single stem.</li>
-      <li>Embed miniature JSON schema snippet near parsing node.</li>
-      <li>Add toggle to show/hide optional docling path.</li>
-    </ul>
-  </details>
-
-  <footer>Generated diagram – customize theme via Mermaid config in the &lt;head&gt;.</footer>
-</div>
+    <details>
+      <summary>Run Sequence (CLI)</summary>
+      <div class="files">python compare_pdf_extractors.py --root data --output-dir debug/compare --save-text --sample-lines 0
+python build_structured_json.py --all --compare-dir debug/compare --out-dir debug/structured_json
+python benchmark_evaluation.py --benchmark-csv data/01_benchmark/eadeies_final.csv --structured-dir debug/structured_json --out debug/benchmark_report.json
+python build_excel_comparison.py --benchmark-csv data/01_benchmark/eadeies_final.csv --structured-dir debug/structured_json --out debug/benchmark_side_by_side.xlsx</div>
+    </details>
+  </main>
+  <footer>Simplified workflow view · Adjust visuals in documentation/workflow.html</footer>
 </body>
 </html>
