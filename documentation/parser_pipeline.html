@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EADEIES Processing Pipeline</title>
+  <!-- No external scripts required; static SVG diagram renders offline. -->
+    <style>
+      :root { color-scheme: light dark; }
+      /* Nice theme variables inspired by workflow.html */
+      :root {
+        --bg:#f8fafc; --panel:#ffffff; --border:#e2e8f0; --text:#0f172a;
+        --accent:#2563eb; --accent-bg:#eff6ff; --muted:#64748b; --good:#059669;
+      }
+      body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+      header { padding:1.6rem 1.2rem 1rem; }
+      main { max-width:1200px; margin:0 auto; padding:0 1.2rem 2rem; }
+      h1 { font-size: 1.4rem; margin: 0 0 8px; }
+      header h1 { font-size:1.9rem; margin:0 0 .5rem; }
+      p { margin: 0 0 12px; color: #555; }
+      p.lead { margin:.2rem 0 1.2rem; font-size:1.05rem; color: var(--muted); }
+      .wrap { display: grid; gap: 16px; }
+      .panel { border: 1px solid var(--border); border-radius: 14px; padding: 12px; background: var(--panel); box-shadow:0 4px 8px -4px rgba(15,23,42,0.06); }
+  .panel.banner { background:#fffbe6; border-color:#ffe58f; }
+      .legend-new { display:flex; flex-wrap:wrap; gap:.6rem; }
+      .legend-item { display:flex; align-items:center; gap:.35rem; font-size:.75rem; background:#fff; border:1px solid var(--border); padding:.35rem .55rem; border-radius:8px; color: var(--muted); }
+      .dot { width:12px; height:12px; border-radius:4px; }
+      .dot.in { background:#f0f9ff; border:1px solid #7dd3fc; }
+      .dot.proc { background:#eef2ff; border:1px solid #c7d2fe; }
+      .dot.out { background:#ecfdf5; border:1px solid #bbf7d0; }
+      .dot.mid { background:#fff7ed; border:1px solid #fed7aa; }
+      .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #ccc; }
+      .sw-input { background:#E6F4FF; }
+      .sw-process { background:#F8F9FA; }
+      .sw-output { background:#E8F5E9; }
+      .sw-optional { background:#FFF7E6; }
+      code.inline { background: #f6f8fa; border: 1px solid #eee; border-radius: 4px; padding: 2px 6px; }
+      a { color: #0969da; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>EADEIES Processing Pipeline</h1>
+      <p class="lead">From PDF permit ➜ raw text ➜ structured JSON ➜ metrics & Excel ➜ visual QA.</p>
+      <div class="legend-new">
+        <div class="legend-item"><div class="dot in"></div> Input</div>
+        <div class="legend-item"><div class="dot proc"></div> Process</div>
+        <div class="legend-item"><div class="dot mid"></div> Intermediate</div>
+        <div class="legend-item"><div class="dot out"></div> Output</div>
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:.8rem;">Updated: 2025-08-25 · <a href="#engine-internals">Jump to extraction details</a></p>
+    </header>
+    <main>
+      <!-- High-Level Flow (compact) -->
+      <section style="margin:0 0 1.4rem;">
+        <div class="panel" style="padding:1rem;overflow:auto;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="980" height="140" role="img" aria-label="PDF to Reports pipeline" style="max-width:100%;height:auto;font-family:system-ui,Arial,sans-serif;">
+            <defs>
+              <style>
+                .blk{fill:#ffffff;stroke:#2563eb;stroke-width:1.5;rx:12;ry:12;}
+                .txt{font-size:13px;fill:#0f172a;font-weight:600;}
+                .sub{font-size:11px;fill:#475569;font-weight:400;}
+                .arrow{stroke:#1e293b;stroke-width:1.4;marker-end:url(#mArrow);} 
+              </style>
+              <marker id="mArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#1e293b" />
+              </marker>
+            </defs>
+            <g transform="translate(10,20)">
+              <rect class="blk" width="130" height="90"/>
+              <text x="65" y="42" text-anchor="middle" class="txt">PDFs</text>
+              <text x="65" y="60" text-anchor="middle" class="sub">data/**</text>
+            </g>
+            <g transform="translate(170,20)">
+              <rect class="blk" width="170" height="90"/>
+              <text x="85" y="38" text-anchor="middle" class="txt">Extraction</text>
+              <text x="85" y="56" text-anchor="middle" class="sub">compare_pdf_extractors</text>
+            </g>
+            <g transform="translate(370,20)">
+              <rect class="blk" width="190" height="90"/>
+              <text x="95" y="32" text-anchor="middle" class="txt">Structured JSON</text>
+              <text x="95" y="50" text-anchor="middle" class="sub">build_structured_json</text>
+            </g>
+            <g transform="translate(590,20)">
+              <rect class="blk" width="170" height="90"/>
+              <text x="85" y="38" text-anchor="middle" class="txt">Benchmark</text>
+              <text x="85" y="56" text-anchor="middle" class="sub">benchmark_evaluation</text>
+            </g>
+            <g transform="translate(780,20)">
+              <rect class="blk" width="190" height="90"/>
+              <text x="95" y="32" text-anchor="middle" class="txt">Reports</text>
+              <text x="95" y="50" text-anchor="middle" class="sub">excel + dashboard</text>
+            </g>
+            <line class="arrow" x1="140" y1="65" x2="170" y2="65"/>
+            <line class="arrow" x1="340" y1="65" x2="370" y2="65"/>
+            <line class="arrow" x1="560" y1="65" x2="590" y2="65"/>
+            <line class="arrow" x1="760" y1="65" x2="780" y2="65"/>
+          </svg>
+        </div>
+      </section>
+
+      <div class="wrap">
+      <div class="panel banner">
+        <strong>New:</strong> Extraction details were added to the diagram (KAEK, Owners, Coverage). Use the jump link above to scroll there.
+      </div>
+
+      <div class="panel banner">
+        <strong>New:</strong> Extraction details were added to the diagram (KAEK, Owners, Coverage). Use the jump link above to scroll there.
+      </div>
+
+      <!-- Extraction internals (diagram) -->
+      <div class="panel" id="engine-internals">
+        <h2 style="margin:0 0 10px;font-size:1.1rem">Extraction internals (diagram)</h2>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:14px;padding:1rem;overflow:auto;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="1100" height="460" role="img" aria-label="Extraction internals for pdfplumber and docling" style="max-width:100%;height:auto;font-family:system-ui,Arial,sans-serif;">
+            <defs>
+              <style>
+                .lane{fill:#f8fafc;stroke:#e2e8f0;rx:16;ry:16;}
+                .title{font-size:14px;fill:#0f172a;font-weight:700;}
+                .blk{fill:#ffffff;stroke:#2563eb;stroke-width:1.3;rx:10;ry:10;}
+                .txt{font-size:12px;fill:#0f172a;font-weight:600;}
+                .sub{font-size:10px;fill:#475569;}
+                .arrow{stroke:#334155;stroke-width:1.3;marker-end:url(#mArrow);} 
+              </style>
+              <marker id="mArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#334155" />
+              </marker>
+            </defs>
+
+            <!-- Lanes -->
+            <rect class="lane" x="20" y="20" width="510" height="420"/>
+            <text x="30" y="42" class="title">pdfplumber</text>
+            <rect class="lane" x="570" y="20" width="510" height="420"/>
+            <text x="580" y="42" class="title">docling</text>
+
+            <!-- pdfplumber steps -->
+            <g transform="translate(40,60)">
+              <rect class="blk" width="470" height="54"/>
+              <text x="10" y="22" class="txt">Text extraction</text>
+              <text x="10" y="40" class="sub">_extract_text_pdfplumber(pdf): join pages, de-hyphenate, normalize whitespace</text>
+            </g>
+            <g transform="translate(40,130)">
+              <rect class="blk" width="470" height="54"/>
+              <text x="10" y="22" class="txt">KAEK</text>
+              <text x="10" y="40" class="sub">extract_kaek(text) → _post_process_kaek(raw_text, value)</text>
+            </g>
+            <g transform="translate(40,200)">
+              <rect class="blk" width="470" height="66"/>
+              <text x="10" y="22" class="txt">Owners</text>
+              <text x="10" y="40" class="sub">parse_pdfplumber_owners(text): isolate section, merge wraps, detect share & right</text>
+            </g>
+            <g transform="translate(40,280)">
+              <rect class="blk" width="470" height="66"/>
+              <text x="10" y="22" class="txt">Coverage (4 cols)</text>
+              <text x="10" y="40" class="sub">parse_pdfplumber_coverage(text): scan per key, numbers via parse_eu_number()</text>
+            </g>
+            <g transform="translate(40,360)">
+              <rect class="blk" width="470" height="54"/>
+              <text x="10" y="22" class="txt">Orient & Emit JSON</text>
+              <text x="10" y="40" class="sub">orient_coverage(cov_map) → build_structured()</text>
+            </g>
+            <!-- Arrows (pdfplumber) -->
+            <line class="arrow" x1="275" y1="114" x2="275" y2="130"/>
+            <line class="arrow" x1="275" y1="184" x2="275" y2="200"/>
+            <line class="arrow" x1="275" y1="266" x2="275" y2="280"/>
+            <line class="arrow" x1="275" y1="346" x2="275" y2="360"/>
+
+            <!-- docling steps -->
+            <g transform="translate(590,60)">
+              <rect class="blk" width="470" height="54"/>
+              <text x="10" y="22" class="txt">Text extraction</text>
+              <text x="10" y="40" class="sub">_extract_text_docling(pdf): DocumentConverter().convert().document.export_to_text()</text>
+            </g>
+            <g transform="translate(590,130)">
+              <rect class="blk" width="470" height="54"/>
+              <text x="10" y="22" class="txt">KAEK</text>
+              <text x="10" y="40" class="sub">extract_kaek(text) → _post_process_kaek(raw_text, value)</text>
+            </g>
+            <g transform="translate(590,200)">
+              <rect class="blk" width="470" height="66"/>
+              <text x="10" y="22" class="txt">Owners</text>
+              <text x="10" y="40" class="sub">extract_docling_tables() → parse_markdown_table() → parse_docling_owners()</text>
+            </g>
+            <g transform="translate(590,280)">
+              <rect class="blk" width="470" height="66"/>
+              <text x="10" y="22" class="txt">Coverage (4 cols)</text>
+              <text x="10" y="40" class="sub">parse_docling_coverage(text): 5-cell rows, numbers via parse_eu_number()</text>
+            </g>
+            <g transform="translate(590,360)">
+              <rect class="blk" width="470" height="54"/>
+              <text x="10" y="22" class="txt">Orient & Emit JSON</text>
+              <text x="10" y="40" class="sub">orient_coverage(cov_map) → build_structured()</text>
+            </g>
+            <!-- Arrows (docling) -->
+            <line class="arrow" x1="825" y1="114" x2="825" y2="130"/>
+            <line class="arrow" x1="825" y1="184" x2="825" y2="200"/>
+            <line class="arrow" x1="825" y1="266" x2="825" y2="280"/>
+            <line class="arrow" x1="825" y1="346" x2="825" y2="360"/>
+          </svg>
+        </div>
+        <p style="margin:10px 0 0;color:#666;font-size:12px">Source: <code>build_structured_json.py</code> (functions shown per block)</p>
+      </div>
+
+  <div id="extraction-details-anchor"></div>
+  <div class="panel">
+  <div class="diagram" style="overflow:visible">
+          <svg viewBox="0 0 1300 950" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EADEIES pipeline diagram">
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+              </marker>
+              <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L10,5 L0,10 z" fill="#4CAF50"/>
+              </marker>
+              <style>
+                .input { fill:#E6F4FF; stroke:#5B9BD5; }
+                .process { fill:#F8F9FA; stroke:#999; }
+                .output { fill:#E8F5E9; stroke:#7CB342; }
+                .optional { fill:#FFF7E6; stroke:#FFA940; }
+                .label { font: 12px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; fill:#111; }
+                .small { font-size:11px; }
+                .arrow { stroke:#555; stroke-width:1.5; fill:none; }
+                .arrow-dash { stroke:#999; stroke-width:1.5; fill:none; stroke-dasharray:5 4; }
+              </style>
+            </defs>
+
+            <!-- Inputs -->
+            <rect x="60" y="60" width="180" height="44" class="node input"/>
+            <text x="150" y="86" text-anchor="middle" class="label">PDF Permits (data/**)</text>
+            <rect x="60" y="120" width="180" height="44" class="node input"/>
+            <text x="150" y="146" text-anchor="middle" class="label">Ground Truth CSV</text>
+            <text x="150" y="162" text-anchor="middle" class="label small">data/01_benchmark/eadeies_final.csv</text>
+
+            <!-- Raw Text Extraction (optional) -->
+            <rect x="320" y="60" width="250" height="44" class="node process"/>
+            <text x="445" y="86" text-anchor="middle" class="label">compare_pdf_extractors.py</text>
+            <text x="445" y="102" text-anchor="middle" class="label small">--root data --save-text</text>
+            <rect x="610" y="40" width="200" height="36" class="node output"/>
+            <text x="710" y="62" text-anchor="middle" class="label">*_pdfplumber.txt</text>
+            <rect x="610" y="80" width="200" height="36" class="node output"/>
+            <text x="710" y="102" text-anchor="middle" class="label">*_docling.txt</text>
+            <rect x="610" y="120" width="200" height="36" class="node output"/>
+            <text x="710" y="142" text-anchor="middle" class="label">&lt;stem&gt;_compare.json</text>
+
+            <!-- Arrows for raw text extraction -->
+            <path d="M240,82 L320,82" class="arrow"/>
+            <path d="M570,82 L610,58" class="arrow"/>
+            <path d="M570,82 L610,98" class="arrow"/>
+            <path d="M570,82 L610,138" class="arrow"/>
+
+            <!-- Structured Parsing -->
+            <rect x="320" y="200" width="250" height="44" class="node process"/>
+            <text x="445" y="226" text-anchor="middle" class="label">build_structured_json.py</text>
+            <text x="445" y="242" text-anchor="middle" class="label small">--all --compare-dir debug/compare --extractors ...</text>
+            <rect x="610" y="200" width="260" height="52" class="node output"/>
+            <text x="740" y="226" text-anchor="middle" class="label">debug/structured_json/</text>
+            <text x="740" y="242" text-anchor="middle" class="label small">&lt;stem&gt;_&lt;engine&gt;_structured.json</text>
+
+            <rect x="320" y="270" width="250" height="44" class="node process optional"/>
+            <text x="445" y="296" text-anchor="middle" class="label">build_structured_json.py</text>
+            <text x="445" y="312" text-anchor="middle" class="label small">--pdf &lt;file&gt;.pdf --extractors &lt;engine&gt;</text>
+
+            <!-- Arrows structured parsing -->
+            <path d="M610,218 L580,218 L580,226 L570,226" class="arrow"/>
+            <path d="M610,218 L570,218" class="arrow" visibility="hidden"/>
+            <path d="M820,226 L870,226" class="arrow" visibility="hidden"/>
+            <path d="M810,226 L870,226" class="arrow" visibility="hidden"/>
+            <path d="M610,218 L580,218 L580,226 L570,226" class="arrow" visibility="hidden"/>
+            <path d="M520,222 L610,226" class="arrow"/>
+            <path d="M520,296 L610,226" class="arrow"/>
+            <path d="M240,82 L260,82 L260,296 L320,296" class="arrow"/>
+            <path d="M610,58 L570,58 L570,222 L320,222" class="arrow"/>
+            <path d="M610,98 L570,98 L570,222 L320,222" class="arrow"/>
+
+            <!-- Evaluation -->
+            <rect x="900" y="170" width="250" height="44" class="node process"/>
+            <text x="1025" y="196" text-anchor="middle" class="label">benchmark_evaluation.py</text>
+            <text x="1025" y="212" text-anchor="middle" class="label small">--benchmark-csv GT --structured-dir SJDIR</text>
+            <rect x="1180" y="170" width="100" height="44" class="node output"/>
+            <text x="1230" y="196" text-anchor="middle" class="label">benchmark_report.json</text>
+
+            <!-- Arrows evaluation -->
+            <path d="M870,226 L900,192" class="arrow"/>
+            <path d="M240,142 L900,212" class="arrow"/>
+            <path d="M1150,192 L1180,192" class="arrow"/>
+
+            <!-- Reporting -->
+            <rect x="900" y="250" width="250" height="44" class="node process"/>
+            <text x="1025" y="276" text-anchor="middle" class="label">build_excel_comparison.py</text>
+            <rect x="1180" y="250" width="100" height="44" class="node output"/>
+            <text x="1230" y="276" text-anchor="middle" class="label">benchmark_side_by_side.xlsx</text>
+
+            <rect x="900" y="320" width="250" height="44" class="node process"/>
+            <text x="1025" y="346" text-anchor="middle" class="label">build_eye_dashboard.py</text>
+            <rect x="1180" y="320" width="100" height="44" class="node output"/>
+            <text x="1230" y="346" text-anchor="middle" class="label">eye_dashboard.html</text>
+
+            <!-- Arrows reporting -->
+            <path d="M870,226 L900,272" class="arrow"/>
+            <path d="M240,142 L900,272" class="arrow"/>
+            <path d="M1150,272 L1180,272" class="arrow"/>
+            <path d="M870,226 L900,342" class="arrow"/>
+            <path d="M240,142 L900,342" class="arrow"/>
+            <path d="M1150,342 L1180,342" class="arrow"/>
+
+            <!-- Runner -->
+            <rect x="320" y="380" width="250" height="44" class="node process"/>
+            <text x="445" y="406" text-anchor="middle" class="label">tools/run_all.py</text>
+            <text x="445" y="422" text-anchor="middle" class="label small">One-shot: text → structured → metrics → dashboard</text>
+            <path d="M240,82 L320,402" class="arrow-dash"/>
+            <path d="M240,142 L320,402" class="arrow-dash"/>
+            <path d="M570,82 L570,60 L445,60 L445,104" class="arrow-dash"/>
+            <path d="M520,222 L520,240 L900,240 L900,214" class="arrow-dash"/>
+            <path d="M520,222 L520,330 L900,330 L900,342" class="arrow-dash"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="panel">
+        <strong>Tips</strong>
+        <ul>
+          <li>Parser-only: use <code class="inline">build_structured_json.py --pdf ... --extractors docling</code> (or pdfplumber).</li>
+          <li>Visual QA: <code class="inline">build_eye_dashboard.py --extractors docling --stems &lt;stem&gt;</code> for a focused view.</li>
+          <li>All-in-one: <code class="inline">python tools/run_all.py --pdf-root data --gt data/01_benchmark/eadeies_final.csv</code>.</li>
+        </ul>
+      </div>
+    </div>
+  </body>
+  </html>

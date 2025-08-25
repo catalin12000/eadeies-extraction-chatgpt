@@ -63,6 +63,53 @@ pip install docling  || echo "docling optional"
 	 * `benchmark_report.json` for aggregate/per-stem metrics.
 	 * Excel sheets (see section 6) for visual QA.
 
+### 4.1 Parser-only quick paths
+- Build structured for a single PDF, specific engine:
+	```bash
+	# pdfplumber only
+	python build_structured_json.py --pdf data/Mike/<stem>.pdf --extractors pdfplumber --out-dir debug/structured_json
+	# docling only (requires `pip install docling`)
+	python build_structured_json.py --pdf data/Mike/<stem>.pdf --extractors docling --out-dir debug/structured_json
+	```
+- Build from pre-extracted texts but only one engine:
+	```bash
+	python build_structured_json.py --stem <stem> --extractors docling --compare-dir debug/compare --out-dir debug/structured_json
+	```
+- Visual one-pager for selected stems and engines:
+	```bash
+	python build_eye_dashboard.py \
+		--benchmark-csv data/01_benchmark/eadeies_final.csv \
+		--structured-dir debug/structured_json \
+		--extractors docling \
+		--stems <stem1> <stem2> \
+		--out debug/eye_dashboard_selected.html
+	```
+
+### 4.2 Programmatic API
+You can call the parser as a function to get structured data from a single PDF without touching disk:
+```python
+from pathlib import Path
+from build_structured_json import extract_pdf_to_structured
+
+data = extract_pdf_to_structured(Path("data/Mike/<stem>.pdf"), extractor="docling")
+print(data["ΚΑΕΚ"], len(data["Στοιχεία κυρίου του έργου"]))
+```
+
+### 4.3 End-to-end runner (optional)
+Run everything (text -> structured -> benchmark -> eye dashboard) in one command:
+```bash
+python tools/run_all.py \
+	--pdf-root data \
+	--gt data/01_benchmark/eadeies_final.csv \
+	--engines pdfplumber docling \
+	--out-dir debug
+```
+This will:
+- compare and save raw texts under `debug/compare/`
+- build structured JSONs to `debug/structured_json/`
+- write `debug/benchmark_report.json`
+- render `debug/eye_dashboard.html`
+
 ## 5. Structured JSON Schema
 Each `<stem>_<extractor>_structured.json`:
 ```json
@@ -99,7 +146,7 @@ Each `<stem>_<extractor>_structured.json`:
 ## 8. Typical Questions / Troubleshooting
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| Missing docling results | Package not installed / Python <3.10 | Install `docling` or upgrade environment. |
+| Missing docling results | Package not installed / pydantic v1 conflict | `pip install docling` and ensure pydantic v2 (see requirements.txt). |
 | KAEK mismatch w/ leading zero | Excel stripped leading zero | Handled automatically in equivalence; check raw JSON if persistent. |
 | Coverage mismatch large factor (e.g., 1834 vs 1.834) | Thousands vs decimal ambiguity | Refine `parse_eu_number` heuristic (see code comments). |
 | Negative values lost | Regex missed '-' | Ensure patterns include `-?` (already for pdfplumber). Extend docling parsing if needed. |
