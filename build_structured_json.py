@@ -33,6 +33,7 @@ import json
 import re
 from pathlib import Path
 from typing import List, Dict, Optional
+import itertools
 
 COMPARE_DIR = Path("debug/compare")
 
@@ -229,7 +230,13 @@ def extract_docling_tables(text: str):
     return tables
 
 def parse_markdown_table(lines: List[str]):
-    rows = []
+    """Parse a markdown-like table, tolerating page-break splits.
+
+    If a row appears truncated (e.g., fewer than 5 cells for coverage), attempt to merge
+    with the next table line when it continues the row (starts without a header keyword).
+    """
+    rows: List[List[str]] = []
+    buffer: Optional[List[str]] = None
     for l in lines:
         l = l.rstrip()
         if not l.strip().startswith("|"):
@@ -238,7 +245,20 @@ def parse_markdown_table(lines: List[str]):
         # skip delimiter row (all dashes)
         if all(re.fullmatch(r"-+", p) for p in parts):
             continue
+        if buffer is not None:
+            # merge continuation of previous row
+            merged = buffer + parts
+            rows.append(merged)
+            buffer = None
+            continue
+        # detect likely truncated coverage row (first cell is a known key but columns < 5)
+        if parts and parts[0] in COVERAGE_KEYS and len(parts) < 5:
+            buffer = parts
+            continue
         rows.append(parts)
+    # flush buffer if any
+    if buffer is not None:
+        rows.append(buffer)
     return rows
 
 def parse_docling_owners(text: str):
@@ -286,19 +306,119 @@ def parse_docling_owners(text: str):
 
 # pdfplumber coverage parsing removed
 
+def _parking_total_fallback(text: str) -> Optional[float]:
+    """Try to recover ΣΥΝΟΛΟ for parking when the table row splits across pages.
+
+    Heuristics:
+      - Find the first occurrence of the key line.
+      - Search within the same line and a small forward window for 'ΣΥΝΟΛ' label followed by an integer.
+      - If not found, take the last integer in the line-snippet (common when columns are printed inline).
+    """
+    key = "Αριθμός Θέσεων Στάθμευσης"
+    idx = text.find(key)
+    if idx == -1:
+        return None
+    snippet = text[idx: idx + 400]
+    # Prefer explicit ΣΥΝΟΛΟ label
+    m = re.search(r"ΣΥΝΟΛ\S*[:|\s]+([0-9]{1,4})", snippet)
+    if m:
+        try:
+            return float(m.group(1))
+        except Exception:
+            pass
+    # Otherwise, collect integers in the first 2 lines after key and use the last
+    lines = snippet.splitlines()[:3]
+    ints: List[int] = []
+    for ln in lines:
+        for tok in re.findall(r"(?<![0-9])[0-9]{1,5}(?![0-9])", ln):
+            try:
+                ints.append(int(tok))
+            except Exception:
+                pass
+    if ints:
+        return float(ints[-1])
+    return None
+
 def parse_docling_coverage(text: str):
     cov = {}
+    # Track whether we are in or near the coverage section and if we just saw the floors row
+    in_coverage_context = False
+    floors_seen_recently = False
+    # Orphan numeric candidate captured immediately after floors
+    orphan_candidate: Optional[List[Optional[float]]] = None
     for tbl_lines in extract_docling_tables(text):
         tbl = parse_markdown_table(tbl_lines)
         if not tbl:
             continue
+        # Detect a coverage header within this table
+        table_has_coverage_header = any(
+            any(tok in cell for tok in ["ΥΦΙΣΤΑ", "ΝΟΜΙΜ", "ΠΡΑΓΜ", "ΣΥΝΟΛ"]) for row in tbl for cell in row
+        )
+        if table_has_coverage_header:
+            in_coverage_context = True
+            floors_seen_recently = False
         # treat every row as potential data row if first cell matches a coverage key
         for i,row in enumerate(tbl):
-            if len(row) == 5 and row[0] in COVERAGE_KEYS:
-                # Skip if this looks like a header row (contains any Greek words for columns instead of numbers in row[1])
-                if i == 0 and any(label in row[1] for label in ["ΥΦΙΣΤΑ", "ΝΟΜΙΜ", "ΠΡΑΓΜ", "ΣΥΝΟΛ"]):
+            if not row:
+                continue
+            # Skip if this looks like a banner/header row (column labels)
+            if i <= 1 and len(row) > 1 and any(label in row[1] for label in ["ΥΦΙΣΤΑ", "ΝΟΜΙΜ", "ΠΡΑΓΜ", "ΣΥΝΟΛ"]):
+                continue
+            if row[0] in COVERAGE_KEYS:
+                # Ensure we have 4 numeric cells; pad with None if truncated
+                values = [parse_eu_number(c) for c in (row[1:5] + [None, None, None, None])[:4]]
+                cov[row[0]] = values
+                floors_seen_recently = (row[0] == "Αριθμός Ορόφων")
+                continue
+            # Heuristic: orphan numeric-only row just after floors -> likely the Parking row stripped of its label
+            if in_coverage_context and floors_seen_recently:
+                # Consider rows with exactly 4 numeric cells (integers most likely)
+                numeric_cells = row[:4]
+                if len(numeric_cells) == 4 and all(parse_eu_number(c) is not None for c in numeric_cells):
+                    # Record a candidate to be applied later only if parking is missing or zero
+                    if orphan_candidate is None:
+                        orphan_candidate = [parse_eu_number(c) for c in numeric_cells]
+                    floors_seen_recently = False  # consume the hint
                     continue
-                cov[row[0]] = [parse_eu_number(c) for c in row[1:5]]
+        # If table had no obvious coverage header, but follows immediately after a coverage table
+        # and we haven't yet consumed the floors hint, try to match a single-row numeric table.
+        if in_coverage_context and floors_seen_recently and tbl:
+            # Some cases show the orphan numeric row as a tiny separate table
+            first_row = tbl[0]
+            numeric_cells = first_row[:4] if first_row else []
+            if len(numeric_cells) == 4 and all(parse_eu_number(c) is not None for c in numeric_cells):
+                if orphan_candidate is None:
+                    orphan_candidate = [parse_eu_number(c) for c in numeric_cells]
+                floors_seen_recently = False
+    # Apply orphan candidate only if label-based extraction is missing or yields a zero total
+    key = "Αριθμός Θέσεων Στάθμευσης"
+    if orphan_candidate is not None:
+        current = cov.get(key)
+        use_candidate = False
+        if current is None:
+            use_candidate = True
+        else:
+            vals = (current + [None, None, None, None])[:4]
+            if vals[3] is None or vals[3] == 0.0:
+                use_candidate = True
+        if use_candidate:
+            cov[key] = [(v if v is not None else 0.0) for v in (orphan_candidate + [None, None, None, None])[:4]]
+
+    # Final fallback: if parking total (ΣΥΝΟΛΟ) is still missing (None), try to recover from text around the key
+    if key in cov:
+        vals = cov.get(key) or [None, None, None, None]
+        if len(vals) < 4:
+            vals = (vals + [None, None, None, None])[:4]
+        if vals[3] is None:
+            tot = _parking_total_fallback(text)
+            if tot is not None:
+                vals[3] = tot
+                cov[key] = vals
+    else:
+        # Entire row missing; if we can find a total, at least populate the ΣΥΝΟΛΟ column
+        tot = _parking_total_fallback(text)
+        if tot is not None:
+            cov[key] = [0.0, 0.0, 0.0, tot]
     return cov
 
 def orient_coverage(cov_map: Dict[str, List[Optional[float]]]):

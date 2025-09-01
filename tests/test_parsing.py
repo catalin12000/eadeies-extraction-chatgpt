@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from build_structured_json import parse_eu_number, _post_process_kaek, orient_coverage, COVERAGE_KEYS
+from build_structured_json import parse_eu_number, _post_process_kaek, orient_coverage, COVERAGE_KEYS, parse_docling_coverage
 from benchmark_evaluation import normalize_owner_component, equivalent_kaek
 
 
@@ -54,3 +54,25 @@ def test_orient_coverage_structure():
     assert set(oriented.keys()) == {'ΥΦΙΣΤΑΜΕΝΑ','ΝΟΜΙΜΟΠΟΙΟΥΜΕΝΑ','ΠΡΑΓΜΑΤΟΠΟΙΟΥΜΕΝΑ','ΣΥΝΟΛΟ'}
     assert oriented['ΥΦΙΣΤΑΜΕΝΑ'][COVERAGE_KEYS[0]] == 1.0
     assert oriented['ΠΡΑΓΜΑΤΟΠΟΙΟΥΜΕΝΑ'][COVERAGE_KEYS[0]] == 0.0  # None -> 0.0 fill
+
+
+def test_parking_orphan_numeric_row_after_floors():
+    # Simulate the reported pattern: coverage table, then an orphan row with 4 integers (parking)
+    text = """
+    ## Στοιχεία Διαγράμματος Κάλυψης
+
+    | Εμβαδόν οικοπέδου              | 256,24     | 256,24           | 256,24             | 256,24   |
+    |--------------------------------|------------|------------------|--------------------|----------|
+    |                                | ΥΦΙΣΤΑΜΕΝΑ | ΝΟΜΙΜΟΠΟΙΟΥ ΜΕΝΑ | ΠΡΑΓΜΑΤΟΠΟΙΟ ΥΜΕΝΑ | ΣΥΝΟΛΟ   |
+    | Εμβ. κάλυψης κτιρίου           | 0          | 0                | 151,14             | 151,14   |
+    | Εμβ. δόμησης κτιρίου           | 0          | 0                | 540,39             | 540,39   |
+    | Εμβ. ακάλυπτου χώρου οικοπέδου | 0          | 0                | 0                  | 0        |
+    | Όγκος κτιρίου (άνω εδάφους)    | 0          | 0                | 1.780,26           | 1.780,26 |
+    | Μέγιστο ύψος κτιρίου           | 0          | 0                | 14,37              | 14,37    |
+    | Αριθμός Ορόφων                 | 0          | 0                | 4                  | 4        |
+
+    | 0          | 0          | 8               | 8   |
+    """
+    cov = parse_docling_coverage(text)
+    assert "Αριθμός Θέσεων Στάθμευσης" in cov
+    assert cov["Αριθμός Θέσεων Στάθμευσης"] == [0.0, 0.0, 8.0, 8.0]

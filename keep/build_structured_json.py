@@ -151,15 +151,30 @@ def extract_docling_tables(text: str):
     return tables
 
 def parse_markdown_table(lines: List[str]):
-    rows = []
+    rows: List[List[str]] = []
+    buffer: Optional[List[str]] = None
     for l in lines:
         l = l.rstrip()
         if not l.strip().startswith("|"):
             continue
         parts = [c.strip() for c in l.strip().strip("|").split("|")]
+        # skip delimiter row (all dashes)
         if all(re.fullmatch(r"-+", p) for p in parts):
             continue
+        if buffer is not None:
+            # merge continuation of previous row
+            merged = buffer + parts
+            rows.append(merged)
+            buffer = None
+            continue
+        # detect likely truncated coverage row (first cell is a known key but columns < 5)
+        if parts and parts[0] in COVERAGE_KEYS and len(parts) < 5:
+            buffer = parts
+            continue
         rows.append(parts)
+    # flush buffer if any
+    if buffer is not None:
+        rows.append(buffer)
     return rows
 
 def parse_docling_owners(text: str):
@@ -202,17 +217,96 @@ def parse_docling_owners(text: str):
 
 # pdfplumber coverage parsing removed
 
+def _parking_total_fallback(text: str) -> Optional[float]:
+    key = "Αριθμός Θέσεων Στάθμευσης"
+    idx = text.find(key)
+    if idx == -1:
+        return None
+    import re as _re
+    snippet = text[idx: idx + 400]
+    m = _re.search(r"ΣΥΝΟΛ\S*[:|\s]+([0-9]{1,4})", snippet)
+    if m:
+        try:
+            return float(m.group(1))
+        except Exception:
+            pass
+    lines = snippet.splitlines()[:3]
+    ints: List[int] = []
+    for ln in lines:
+        for tok in _re.findall(r"(?<![0-9])[0-9]{1,5}(?![0-9])", ln):
+            try:
+                ints.append(int(tok))
+            except Exception:
+                pass
+    if ints:
+        return float(ints[-1])
+    return None
+
 def parse_docling_coverage(text: str):
     cov = {}
+    in_coverage_context = False
+    floors_seen_recently = False
+    orphan_candidate: Optional[List[Optional[float]]] = None
     for tbl_lines in extract_docling_tables(text):
         tbl = parse_markdown_table(tbl_lines)
         if not tbl:
             continue
+        table_has_coverage_header = any(
+            any(tok in cell for tok in ["ΥΦΙΣΤΑ", "ΝΟΜΙΜ", "ΠΡΑΓΜ", "ΣΥΝΟΛ"]) for row in tbl for cell in row
+        )
+        if table_has_coverage_header:
+            in_coverage_context = True
+            floors_seen_recently = False
         for i,row in enumerate(tbl):
-            if len(row) == 5 and row[0] in COVERAGE_KEYS:
-                if i == 0 and any(label in row[1] for label in ["ΥΦΙΣΤΑ", "ΝΟΜΙΜ", "ΠΡΑΓΜ", "ΣΥΝΟΛ"]):
+            if not row:
+                continue
+            if i <= 1 and len(row) > 1 and any(label in row[1] for label in ["ΥΦΙΣΤΑ", "ΝΟΜΙΜ", "ΠΡΑΓΜ", "ΣΥΝΟΛ"]):
+                continue
+            if row[0] in COVERAGE_KEYS:
+                values = [parse_eu_number(c) for c in (row[1:5] + [None, None, None, None])[:4]]
+                cov[row[0]] = values
+                floors_seen_recently = (row[0] == "Αριθμός Ορόφων")
+                continue
+            if in_coverage_context and floors_seen_recently:
+                numeric_cells = row[:4]
+                if len(numeric_cells) == 4 and all(parse_eu_number(c) is not None for c in numeric_cells):
+                    if orphan_candidate is None:
+                        orphan_candidate = [parse_eu_number(c) for c in numeric_cells]
+                    floors_seen_recently = False
                     continue
-                cov[row[0]] = [parse_eu_number(c) for c in row[1:5]]
+        if in_coverage_context and floors_seen_recently and tbl:
+            first_row = tbl[0]
+            numeric_cells = first_row[:4] if first_row else []
+            if len(numeric_cells) == 4 and all(parse_eu_number(c) is not None for c in numeric_cells):
+                if orphan_candidate is None:
+                    orphan_candidate = [parse_eu_number(c) for c in numeric_cells]
+                floors_seen_recently = False
+    key = "Αριθμός Θέσεων Στάθμευσης"
+    if orphan_candidate is not None:
+        current = cov.get(key)
+        use_candidate = False
+        if current is None:
+            use_candidate = True
+        else:
+            vals = (current + [None, None, None, None])[:4]
+            if vals[3] is None or vals[3] == 0.0:
+                use_candidate = True
+        if use_candidate:
+            cov[key] = [(v if v is not None else 0.0) for v in (orphan_candidate + [None, None, None, None])[:4]]
+
+    if key in cov:
+        vals = cov.get(key) or [None, None, None, None]
+        if len(vals) < 4:
+            vals = (vals + [None, None, None, None])[:4]
+        if vals[3] is None:
+            tot = _parking_total_fallback(text)
+            if tot is not None:
+                vals[3] = tot
+                cov[key] = vals
+    else:
+        tot = _parking_total_fallback(text)
+        if tot is not None:
+            cov[key] = [0.0, 0.0, 0.0, tot]
     return cov
 
 def orient_coverage(cov_map: Dict[str, List[Optional[float]]]):

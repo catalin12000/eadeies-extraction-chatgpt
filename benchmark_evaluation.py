@@ -59,6 +59,26 @@ def strip_accents(s: str) -> str:
     nfkd = unicodedata.normalize("NFD", s)
     return "".join(ch for ch in nfkd if unicodedata.category(ch) != "Mn")
 
+def _greek_to_ascii(s: str) -> str:
+    """Transliterate common Greek letters to ASCII for bilingual name matching.
+
+    This is a lightweight map (no external deps) to align ΓΕΩΡΓΙΟΣ ~ GEORGIOS, Χ ~ CH, Θ ~ TH, Ψ ~ PS, etc.
+    """
+    mapping = {
+        # Uppercase Greek
+        "Α":"A","Β":"V","Γ":"G","Δ":"D","Ε":"E","Ζ":"Z","Η":"I","Θ":"TH","Ι":"I","Κ":"K","Λ":"L","Μ":"M","Ν":"N","Ξ":"X","Ο":"O","Π":"P","Ρ":"R","Σ":"S","Τ":"T","Υ":"Y","Φ":"F","Χ":"CH","Ψ":"PS","Ω":"O",
+        # Final sigma
+        "Σ":"S","Ϲ":"S",
+        # Accented (already stripped in strip_accents but keep for safety)
+        "Ά":"A","Έ":"E","Ί":"I","Ή":"I","Ό":"O","Ύ":"Y","Ώ":"O",
+        # Lowercase fallbacks (in case)
+        "α":"A","β":"V","γ":"G","δ":"D","ε":"E","ζ":"Z","η":"I","θ":"TH","ι":"I","κ":"K","λ":"L","μ":"M","ν":"N","ξ":"X","ο":"O","π":"P","ρ":"R","σ":"S","ς":"S","τ":"T","υ":"Y","φ":"F","χ":"CH","ψ":"PS","ω":"O",
+    }
+    out = []
+    for ch in s:
+        out.append(mapping.get(ch, ch))
+    return "".join(out)
+
 def normalize_owner_component(s: str) -> str:
     if not s:
         return ""
@@ -67,11 +87,14 @@ def normalize_owner_component(s: str) -> str:
     # Remove parentheses content that is often transliterations or registry codes
     s = re.sub(r"\([^)]*\)", " ", s)
     # Replace punctuation with space
+    s = s.replace("…", " ")  # unicode ellipsis
     s = re.sub(r"[.,;&:'`\-]+", " ", s)
     # Collapse slashes used as separators into space
     s = s.replace("/"," ")
     # Uppercase
     s = s.upper()
+    # Transliterate Greek to ASCII to compare against English spellings
+    s = _greek_to_ascii(s)
     # Tokenize and drop corporate tokens
     tokens = [t for t in s.split() if t and t not in CORPORATE_TOKENS]
     return " ".join(tokens)
@@ -83,18 +106,90 @@ class Owner:
     def key(self) -> Tuple[str,str]:
         return (normalize_owner_component(self.surname), normalize_owner_component(self.name))
 
+    def signature(self) -> frozenset:
+        """Order-insensitive token signature over both components.
+
+        Helps match cases where all name tokens are in one field or order varies (e.g., "ΓΕΩΡΓΙΟΣ ΓΙΑΝΝΙΩΔΗΣ").
+        """
+        a, b = self.key()
+        toks = [t for t in (a + " " + b).split() if t]
+        return frozenset(toks)
+
+def match_owners(gt: List[Owner], pred: List[Owner]) -> Tuple[int,int,int]:
+    """Compute TP, FP, FN with tolerant matching.
+
+    Phase 1: exact tuple match on (normalized surname, normalized name).
+    Phase 2: greedy match on token-set signatures to handle swapped order or single-field names.
+    """
+    gt_remaining = list(gt)
+    pred_remaining = list(pred)
+    tp = 0
+    # Phase 1: exact
+    used_pred = set()
+    for i, g in enumerate(list(gt_remaining)):
+        gk = g.key()
+        for j, p in enumerate(pred_remaining):
+            if j in used_pred:
+                continue
+            if p.key() == gk:
+                tp += 1
+                used_pred.add(j)
+                gt_remaining[i] = None  # type: ignore
+                break
+    gt_remaining = [x for x in gt_remaining if x is not None]
+    pred_remaining = [p for j, p in enumerate(pred_remaining) if j not in used_pred]
+    # Phase 2: signature (order-insensitive token match)
+    used_pred2 = set()
+    for i, g in enumerate(gt_remaining):
+        gs = g.signature()
+        for j, p in enumerate(pred_remaining):
+            if j in used_pred2:
+                continue
+            if p.signature() == gs and gs:
+                tp += 1
+                used_pred2.add(j)
+                gt_remaining[i] = None  # type: ignore
+                break
+    gt_remaining = [x for x in gt_remaining if x is not None]
+    pred_remaining = [p for j, p in enumerate(pred_remaining) if j not in used_pred2]
+    fn = len(gt_remaining)
+    fp = len(pred_remaining)
+    return tp, fp, fn
+
 def parse_float(val: str) -> Optional[float]:
+    """Parse numbers from GT tolerant to thousand separators like '1.834' -> 1834.
+
+    Rules:
+      - Comma is decimal separator, dots before comma are thousands.
+      - Without comma: if single dot and exactly 3 trailing digits, treat dot as thousands.
+      - With multiple dot-separated 3-digit groups, treat dots as thousands.
+      - Otherwise, a single dot with 1-2 trailing digits is decimal.
+    """
     if val is None:
         return None
     v = val.strip().replace("\xa0"," ").replace(" "," ")
     if not v:
         return None
     v = v.strip('"')
-    if v.count(",") == 1 and v.count(".") >= 1:
-        int_part, dec = v.split(",",1)
-        int_part = int_part.replace(".","")
+    raw = v
+    if v.count(",") >= 1:
+        int_part, dec = v.split(",", 1)
+        int_part = int_part.replace(".", "")
         v = int_part + "." + dec
-    v = v.replace(",",".")
+    else:
+        # No comma; handle dots
+        if v.count(".") == 0:
+            pass
+        else:
+            parts = v.split(".")
+            if len(parts) > 1 and all(len(p) == 3 for p in parts[1:]):
+                v = "".join(parts)
+            elif len(parts) == 2 and len(parts[1]) == 3:
+                v = parts[0] + parts[1]
+            elif len(parts) == 2 and 1 <= len(parts[1]) <= 2:
+                v = parts[0] + "." + parts[1]
+            else:
+                v = "".join(parts)
     try:
         return float(v)
     except ValueError:
@@ -205,11 +300,9 @@ def evaluate(stems: List[str], gt_rows: Dict[str, dict], structured_dir: Path):
             if kaek_ok:
                 kaek_correct += 1
             stem_metrics["kaek_match"] = kaek_ok
-            gt_owner_set = {o.key() for o in extract_ground_truth_owners(gt)}
-            pred_owner_set = {o.key() for o in extract_json_owners(data)}
-            tp = len(gt_owner_set & pred_owner_set)
-            fp = len(pred_owner_set - gt_owner_set)
-            fn = len(gt_owner_set - pred_owner_set)
+            gt_owners = extract_ground_truth_owners(gt)
+            pred_owners = extract_json_owners(data)
+            tp, fp, fn = match_owners(gt_owners, pred_owners)
             owners_tp += tp
             owners_fp += fp
             owners_fn += fn
