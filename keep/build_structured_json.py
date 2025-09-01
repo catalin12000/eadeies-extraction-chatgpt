@@ -285,7 +285,7 @@ def main():
             ap.error("Don't combine --all with --stem/--pdf")
         if not args.compare_dir.exists():
             raise SystemExit(f"Compare dir not found: {args.compare_dir}")
-    stems = sorted({p.name.rsplit('_docling.txt',1)[0] for p in args.compare_dir.glob('*_docling.txt')})
+        stems = sorted({p.name.rsplit('_docling.txt',1)[0] for p in args.compare_dir.glob('*_docling.txt')})
         if args.limit > 0:
             stems = stems[: args.limit]
         args.out_dir.mkdir(parents=True, exist_ok=True)
