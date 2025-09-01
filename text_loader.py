@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 from pathlib import Path
-import pdfplumber  # type: ignore
-import re
 
 
 def get_text(pdf_path: Path) -> str:
-    with pdfplumber.open(str(pdf_path)) as pdf:
-        pages = [p.extract_text() or "" for p in pdf.pages]
-    text = "\n\n".join(pages)
-    text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{2,}", "\n\n", text)
-    return text.strip()
+    """Extract plain text from a PDF using docling.
+
+    Returns empty string if docling is not available.
+    """
+    try:
+        from docling.document_converter import DocumentConverter  # type: ignore
+    except Exception:
+        return ""
+    converter = DocumentConverter()
+    result = converter.convert(str(pdf_path))
+    text = result.document.export_to_text() if hasattr(result.document, "export_to_text") else str(result.document)
+    return (text or "").strip()

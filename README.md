@@ -1,9 +1,9 @@
 # EADEIES Extraction & Benchmarking Toolkit
 
-Pipeline for comparing PDF permit extraction quality between `pdfplumber` and `docling`, normalizing structured data (KAEK, Owners, Coverage metrics), and benchmarking against a curated ground-truth CSV with JSON + Excel reporting.
+Pipeline for extracting PDF permits with `docling`, normalizing structured data (KAEK, Owners, Coverage metrics), and benchmarking against a curated ground-truth CSV with JSON + Excel reporting.
 
 ## 1. Features Overview
-* Dual extractor text comparison (timings, similarity, basic text stats)
+* Raw text comparison script retained (timings, similarity, basic text stats)
 * Robust KAEK extraction with tolerance for fragmented `/0/0` suffix & leading-zero equivalence
 * Owner table parsing (heuristics for raw text + markdown tables) with aggressive normalization (accents, punctuation, corporate tokens)
 * Coverage diagram parsing (4 groups × 7 metrics = 28 cells) with EU number parsing (commas, thousands dots, negatives)
@@ -13,8 +13,8 @@ Pipeline for comparing PDF permit extraction quality between `pdfplumber` and `d
 ## 2. Repository Structure (Key Files)
 | Path | Purpose |
 |------|---------|
-| `compare_pdf_extractors.py` | Raw text extraction + per-file / aggregate text metrics. |
-| `build_structured_json.py` | Parse raw text to canonical JSON per extractor. |
+| `compare_pdf_extractors.py` | Raw text extraction + per-file / aggregate text metrics (docling primary; pdfplumber optional). |
+| `build_structured_json.py` | Parse raw text to canonical JSON (docling-only). |
 | `benchmark_evaluation.py` | Compute accuracy metrics vs ground-truth CSV. |
 | `build_excel_comparison.py` | Generate multi-sheet Excel for manual QA. |
 | `data/01_benchmark/eadeies_final.csv` | Ground truth (KAEK, owners, coverage). |
@@ -30,18 +30,18 @@ python -m venv .venv
 source .venv/bin/activate  # macOS/Linux
 pip install --upgrade pip
 pip install -r requirements.txt
-# Optional: install docling (if Python >=3.10) – if fails, pdfplumber-only still works
-pip install docling  || echo "docling optional"
+# Install docling (Python >=3.10 recommended)
+pip install docling
 ```
 
 ## 4. End-to-End Workflow
 1. (Optional) Gather PDFs under `data/` (subdirectories allowed). Ground-truth CSV already present.
-2. Extract raw text & comparison metrics:
+2. (Optional) Extract raw text & comparison metrics:
 	 ```bash
 	 python compare_pdf_extractors.py --root data --output-dir debug/compare --save-text --sample-lines 0
 	 ```
 	 Outputs: `*_pdfplumber.txt`, `*_docling.txt`, and `<stem>_compare.json` plus `_aggregate_summary.json`.
-3. Build structured JSON for all stems:
+3. Build structured JSON for all stems (docling-only):
 	 ```bash
 	 python build_structured_json.py --all --compare-dir debug/compare --out-dir debug/structured_json
 	 ```
@@ -64,11 +64,8 @@ pip install docling  || echo "docling optional"
 	 * Excel sheets (see section 6) for visual QA.
 
 ### 4.1 Parser-only quick paths
-- Build structured for a single PDF, specific engine:
+- Build structured for a single PDF:
 	```bash
-	# pdfplumber only
-	python build_structured_json.py --pdf data/Mike/<stem>.pdf --extractors pdfplumber --out-dir debug/structured_json
-	# docling only (requires `pip install docling`)
 	python build_structured_json.py --pdf data/Mike/<stem>.pdf --extractors docling --out-dir debug/structured_json
 	```
 - Build from pre-extracted texts but only one engine:
@@ -101,11 +98,10 @@ Run everything (text -> structured -> benchmark -> eye dashboard) in one command
 python tools/run_all.py \
 	--pdf-root data \
 	--gt data/01_benchmark/eadeies_final.csv \
-	--engines pdfplumber docling \
+	--engines docling \
 	--out-dir debug
 ```
 This will:
-- compare and save raw texts under `debug/compare/`
 - build structured JSONs to `debug/structured_json/`
 - write `debug/benchmark_report.json`
 - render `debug/eye_dashboard.html`
@@ -131,9 +127,9 @@ Each `<stem>_<extractor>_structured.json`:
 ## 6. Excel Workbook Sheets
 | Sheet | Content |
 |-------|---------|
-| `KAEK` | Ground truth & both predictions + match flags (1/0). |
+| `KAEK` | Ground truth & prediction + match flags (1/0). |
 | `Owners` | Row-aligned GT vs predicted surnames/names with per-slot normalized match flags. |
-| `Coverage` | One row per (ΑΔΑ, Group, Metric) with GT, predictions, boolean matches, and diffs. |
+| `Coverage` | One row per (ΑΔΑ, Group, Metric) with GT, prediction, boolean matches, and diffs. |
 | `CoverageWide` | Wide format: one row per ΑΔΑ, columns for all coverage metrics (prefers docling). |
 | `CoverageMismatches` | Only rows where prediction differs (any extractor). |
 
@@ -149,8 +145,8 @@ Each `<stem>_<extractor>_structured.json`:
 | Missing docling results | Package not installed / pydantic v1 conflict | `pip install docling` and ensure pydantic v2 (see requirements.txt). |
 | KAEK mismatch w/ leading zero | Excel stripped leading zero | Handled automatically in equivalence; check raw JSON if persistent. |
 | Coverage mismatch large factor (e.g., 1834 vs 1.834) | Thousands vs decimal ambiguity | Refine `parse_eu_number` heuristic (see code comments). |
-| Negative values lost | Regex missed '-' | Ensure patterns include `-?` (already for pdfplumber). Extend docling parsing if needed. |
-| Owners low precision for pdfplumber | Text layout/line wrapping heuristic limits | Improve `parse_pdfplumber_owners` to stitch multi-line rows or fallback to regex extraction. |
+| Negative values lost | Regex missed '-' | Ensure patterns include `-?` (already handled in docling parser). |
+| Owners mis-splitting due to layout | Text layout/line wrapping heuristic limits | Adjust owners table heuristics (header detection, row stitching). |
 
 ## 9. Extending / Improving
 * Add heuristic: treat pattern `^\d\.\d{3}$` as decimal if expected metric logically < 100.
@@ -159,12 +155,7 @@ Each `<stem>_<extractor>_structured.json`:
 * Add unit tests for number parsing and KAEK post-processing.
 
 ## 10. Quick Metrics Recap (Current)
-See `debug/benchmark_report.json` for exact values. Example snapshot:
-```
-KAEK exact: 100% both
-Owners F1: pdfplumber ~0.50, docling ~0.89
-Coverage exact cells: pdfplumber ~98.95%, docling ~99.00%
-```
+See `debug/benchmark_report.json` for exact values.
 
 ## 11. Re-running From Scratch
 ```bash

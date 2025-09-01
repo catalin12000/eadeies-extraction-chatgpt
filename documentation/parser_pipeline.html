@@ -251,14 +251,14 @@
             <!-- Structured Parsing -->
             <rect x="320" y="200" width="250" height="44" class="node process"/>
             <text x="445" y="226" text-anchor="middle" class="label">build_structured_json.py</text>
-            <text x="445" y="242" text-anchor="middle" class="label small">--all --compare-dir debug/compare --extractors ...</text>
+            <text x="445" y="242" text-anchor="middle" class="label small">--pdf &lt;file&gt;.pdf --extractors docling</text>
             <rect x="610" y="200" width="260" height="52" class="node output"/>
             <text x="740" y="226" text-anchor="middle" class="label">debug/structured_json/</text>
             <text x="740" y="242" text-anchor="middle" class="label small">&lt;stem&gt;_&lt;engine&gt;_structured.json</text>
 
             <rect x="320" y="270" width="250" height="44" class="node process optional"/>
             <text x="445" y="296" text-anchor="middle" class="label">build_structured_json.py</text>
-            <text x="445" y="312" text-anchor="middle" class="label small">--pdf &lt;file&gt;.pdf --extractors &lt;engine&gt;</text>
+            <text x="445" y="312" text-anchor="middle" class="label small">--pdf &lt;file&gt;.pdf --extractors docling</text>
 
             <!-- Arrows structured parsing -->
             <path d="M610,218 L580,218 L580,226 L570,226" class="arrow"/>
@@ -319,7 +319,7 @@
       <div class="panel">
         <strong>Tips</strong>
         <ul>
-          <li>Parser-only: use <code class="inline">build_structured_json.py --pdf ... --extractors docling</code> (or pdfplumber).</li>
+          <li>Parser-only: use <code class="inline">build_structured_json.py --pdf ... --extractors docling</code>.</li>
           <li>Visual QA: <code class="inline">build_eye_dashboard.py --extractors docling --stems &lt;stem&gt;</code> for a focused view.</li>
           <li>All-in-one: <code class="inline">python tools/run_all.py --pdf-root data --gt data/01_benchmark/eadeies_final.csv</code>.</li>
         </ul>

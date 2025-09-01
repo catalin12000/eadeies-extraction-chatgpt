@@ -10,7 +10,7 @@ Inputs (defaults chosen for this repo layout):
   --benchmark-csv data/01_benchmark/eadeies_final.csv
   --structured-dir debug/structured_json
   --pdf-dirs data/Athens data/Thessaloniki data/Pireaues data/Mike
-  --extractors docling pdfplumber
+    --extractors docling
   --out debug/eye_dashboard.html
 
 Usage:
@@ -268,7 +268,7 @@ def main():
     ap.add_argument("--benchmark-csv", type=Path, default=Path("data/01_benchmark/eadeies_final.csv"))
     ap.add_argument("--structured-dir", type=Path, default=Path("debug/structured_json"))
     ap.add_argument("--pdf-dirs", type=Path, nargs="*", default=[Path("data/Athens"), Path("data/Thessaloniki"), Path("data/Pireaues"), Path("data/Mike")])
-    ap.add_argument("--extractors", nargs="*", default=["docling", "pdfplumber"], help="Which extractors to include (must match structured JSON filenames)")
+    ap.add_argument("--extractors", nargs="*", default=["docling"], help="Which extractors to include (must match structured JSON filenames)")
     ap.add_argument("--out", type=Path, default=Path("debug/eye_dashboard.html"))
     ap.add_argument("--stems", nargs="*", help="Optional subset of stems to include; defaults to all from CSV")
     args = ap.parse_args()

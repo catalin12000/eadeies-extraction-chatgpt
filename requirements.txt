@@ -2,13 +2,11 @@
 pydantic>=2.6,<3
 python-dotenv==1.0.1
 openai==0.28.1
-pdfplumber==0.11.4
 
 # Excel export
 openpyxl==3.1.2
 
-# Optional: docling
-# Install with: pip install docling
+# Docling (install separately if needed): pip install docling
 # Note: ensure pydantic v2 is installed (pinned above). Some environments may show urllib3/OpenSSL warnings; they are non-fatal.
 
 # Utilities

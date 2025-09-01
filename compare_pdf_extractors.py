@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Compare PDF text extraction between pdfplumber and docling (single file or batch).
 
+Note: Project is now docling-only for downstream parsing. This script remains for 
+raw text comparison and can run with only docling available; pdfplumber is optional.
+
 Usage (single file):
     python compare_pdf_extractors.py --pdf path/to/file.pdf [--output-dir ./debug]
 
@@ -37,12 +40,12 @@ import difflib
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Iterable, List
 
-# pdfplumber import (required)
+# pdfplumber import (optional)
 try:
     import pdfplumber  # type: ignore
-except Exception as e:  # pragma: no cover
-    print("pdfplumber is required for this benchmark. Install with: pip install pdfplumber", file=sys.stderr)
-    raise
+    _PDFPLUMBER_AVAILABLE = True
+except Exception:
+    _PDFPLUMBER_AVAILABLE = False
 
 # Optional docling import
 try:
@@ -88,6 +91,8 @@ class ExtractionResult:
 
 
 def extract_pdfplumber(pdf_path: Path) -> ExtractionResult:
+    if not _PDFPLUMBER_AVAILABLE:
+        return ExtractionResult(False, "pdfplumber", error="pdfplumber not installed")
     start = time.perf_counter()
     try:
         with pdfplumber.open(str(pdf_path)) as pdf:
