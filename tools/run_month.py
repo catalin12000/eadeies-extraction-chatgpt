@@ -107,6 +107,8 @@ def _extract_one(pdf_path: Path, struct_dir: Path, resume: bool) -> Dict[str, An
             "parking_total": parking if isinstance(parking, (int, float)) else None,
             "has_tables": 1 if meta.get("has_tables") else 0,
             "tables_count": int(meta.get("tables_count") or 0),
+            "owners_present": 1 if meta.get("owners_present") else 0,
+            "coverage_present": 1 if meta.get("coverage_present") else 0,
         }
     t0 = time.time()
     try:
@@ -132,6 +134,8 @@ def _extract_one(pdf_path: Path, struct_dir: Path, resume: bool) -> Dict[str, An
             "parking_total": parking if isinstance(parking, (int, float)) else None,
             "has_tables": 1 if meta.get("has_tables") else 0,
             "tables_count": int(meta.get("tables_count") or 0),
+            "owners_present": 1 if meta.get("owners_present") else 0,
+            "coverage_present": 1 if meta.get("coverage_present") else 0,
         }
     except Exception as e:  # pragma: no cover
         elapsed = round(time.time() - t0, 3)
@@ -166,8 +170,10 @@ def write_manifest(manifest_csv: Path, rows: List[Dict[str, Any]]) -> None:
         "owners_count",
         "floors_total",
         "parking_total",
-    "has_tables",
-    "tables_count",
+        "has_tables",
+        "tables_count",
+        "owners_present",
+        "coverage_present",
     ]
     with manifest_csv.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=headers)
@@ -280,7 +286,19 @@ def main():
     out_csv = write_gt_like_csv(run_dir, struct_dir, run_name)
 
     t_elapsed = round(time.time() - t_start, 2)
-    print(f"Done in {t_elapsed}s. ok={ok}, skipped={skipped}, err={err}. CSV: {out_csv}")
+    # Summary diagnostics
+    try:
+        total_rows = len(results)
+        tables_yes = sum(int(r.get("has_tables") or 0) for r in results)
+        owners_yes = sum(int(r.get("owners_present") or 0) for r in results)
+        coverage_yes = sum(int(r.get("coverage_present") or 0) for r in results)
+        print(
+            f"Done in {t_elapsed}s. ok={ok}, skipped={skipped}, err={err}. "
+            f"Tables: {tables_yes}/{total_rows}, Owners: {owners_yes}/{total_rows}, Coverage: {coverage_yes}/{total_rows}. "
+            f"CSV: {out_csv}"
+        )
+    except Exception:
+        print(f"Done in {t_elapsed}s. ok={ok}, skipped={skipped}, err={err}. CSV: {out_csv}")
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -485,7 +485,10 @@ def build_structured(stem: str, raw_text: str, extractor: str):
             "has_tables": has_tables,
             "tables_count": tables_count,
             "owners_count": len(owners),
+            "owners_present": bool(owners),
+            "coverage_present": bool(cov),
             "coverage_keys_found": sorted(list(cov.keys())),
+            "coverage_keys_count": len(list(cov.keys())),
         },
     }
     return structured
