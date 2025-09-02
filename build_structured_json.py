@@ -467,11 +467,26 @@ def build_structured(stem: str, raw_text: str, extractor: str):
     kaek = _post_process_kaek(raw_text, kaek)
     owners = parse_docling_owners(raw_text)
     cov = parse_docling_coverage(raw_text)
+    # Meta diagnostics: detect if any markdown-like tables exist in the document
+    try:
+        tables = extract_docling_tables(raw_text)
+        tables_count = len(tables)
+        has_tables = tables_count > 0
+    except Exception:
+        tables_count = 0
+        has_tables = False
     structured = {
         "ΑΔΑ": stem,
         "ΚΑΕΚ": kaek,
         "Στοιχεία κυρίου του έργου": owners,
         "Στοιχεία Διαγράμματος Κάλυψης": orient_coverage(cov),
+        "_meta": {
+            "extractor": extractor,
+            "has_tables": has_tables,
+            "tables_count": tables_count,
+            "owners_count": len(owners),
+            "coverage_keys_found": sorted(list(cov.keys())),
+        },
     }
     return structured
 

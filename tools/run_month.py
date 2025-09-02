@@ -105,13 +105,15 @@ def _extract_one(pdf_path: Path, struct_dir: Path, resume: bool) -> Dict[str, An
         cov = data.get("Στοιχεία Διαγράμματος Κάλυψης", {}) or {}
         floors = (cov.get("ΣΥΝΟΛΟ", {}) or {}).get("Αριθμός Ορόφων")
         parking = (cov.get("ΣΥΝΟΛΟ", {}) or {}).get("Αριθμός Θέσεων Στάθμευσης")
+        meta = data.get("_meta", {}) or {}
+        no_tables_warn = "no_tables" if not meta.get("has_tables") else ""
         return {
             "stem": stem,
             "pdf": str(pdf_path),
             "json": str(out_json),
             "status": "ok",
             "elapsed_sec": elapsed,
-            "err": "",
+            "err": no_tables_warn,
             "kaek_present": 1 if (data.get("ΚΑΕΚ") or "").strip() else 0,
             "owners_count": int(len(owners)),
             "floors_total": floors if isinstance(floors, (int, float)) else None,
