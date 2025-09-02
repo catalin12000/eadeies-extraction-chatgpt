@@ -50,6 +50,13 @@ try:
 except Exception:  # pragma: no cover
     Workbook = None  # type: ignore
 
+# Prefer a safer multiprocessing start method across macOS/varied IDEs
+try:  # pragma: no cover
+    import multiprocessing as _mp
+    _mp.set_start_method("spawn", force=True)
+except Exception:
+    pass
+
 
 def discover_pdfs(input_dir: Path) -> List[Path]:
     """Recursively find all .pdf/.PDF files under input_dir."""

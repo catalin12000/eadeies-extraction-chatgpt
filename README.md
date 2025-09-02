@@ -149,6 +149,7 @@ Each `<stem>_<extractor>_structured.json`:
 | Issue | Cause | Fix |
 |-------|-------|-----|
 | Missing docling results | Package not installed / pydantic v1 conflict | `pip install docling` and ensure pydantic v2 (see requirements.txt). |
+| IDE crash on run (macOS) | Multiprocessing with default 'fork' and ML libs (PyTorch) can crash IDEs | We force `spawn` in `tools/run_month.py`. Ensure you run with `python3 tools/run_month.py ...`. If crash persists, run in terminal, not the IDE debug console. |
 | KAEK mismatch w/ leading zero | Excel stripped leading zero | Handled automatically in equivalence; check raw JSON if persistent. |
 | Coverage mismatch large factor (e.g., 1834 vs 1.834) | Thousands vs decimal ambiguity | Refine `parse_eu_number` heuristic (see code comments). |
 | Negative values lost | Regex missed '-' | Ensure patterns include `-?` (already handled in docling parser). |
