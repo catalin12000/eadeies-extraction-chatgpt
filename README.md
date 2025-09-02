@@ -184,3 +184,5 @@ Add a LICENSE file if this will be shared externally.
 Feel free to adapt/extend. Open an issue or PR for enhancements.
 
 See also: `CHAT_HISTORY.md` for a concise log of design decisions and operational tips.
+
+For day-to-day collaboration across devices, use `WORKLOG.md` as a simple, commit-backed chat/notes thread.
