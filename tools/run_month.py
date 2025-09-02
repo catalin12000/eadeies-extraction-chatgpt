@@ -186,7 +186,9 @@ def write_manifest(manifest_csv: Path, rows: List[Dict[str, Any]]) -> None:
         w = csv.DictWriter(f, fieldnames=headers)
         w.writeheader()
         for r in rows:
-            w.writerow(r)
+            # Normalize None to empty string for CSV readability
+            rr = {k: ("" if v is None else v) for k, v in r.items()}
+            w.writerow(rr)
 
 
 def write_gt_like_csv(run_dir: Path, structured_dir: Path, run_name: str) -> Path:
@@ -243,6 +245,7 @@ def main():
     ap.add_argument("--resume", action="store_true", help="Skip files that already have JSON outputs")
     ap.add_argument("--yes", action="store_true", help="Proceed without interactive confirmation")
     ap.add_argument("--progress-every", type=int, default=50, help="Print progress every N files")
+    ap.add_argument("--limit", type=int, default=0, help="Process only the first N PDFs (0 = no limit)")
     args = ap.parse_args()
 
     input_dir: Path = args.input_dir
@@ -255,7 +258,11 @@ def main():
 
     pdfs = discover_pdfs(input_dir)
     total = len(pdfs)
-    print(f"Discovered {total} PDF(s) under {input_dir}")
+    if args.limit and args.limit > 0:
+        pdfs = pdfs[: args.limit]
+        print(f"Discovered {total} PDF(s) under {input_dir}; limiting to first {len(pdfs)}")
+    else:
+        print(f"Discovered {total} PDF(s) under {input_dir}")
     if total == 0:
         return
 
