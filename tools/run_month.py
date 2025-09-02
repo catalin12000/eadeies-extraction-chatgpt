@@ -84,6 +84,16 @@ def _extract_one(pdf_path: Path, struct_dir: Path, resume: bool) -> Dict[str, An
     stem = pdf_path.stem
     out_json = json_path_for(struct_dir, stem)
     if resume and out_json.exists():
+        # Populate fields from existing JSON to keep manifest informative
+        try:
+            data = json.loads(out_json.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+        owners = data.get("Στοιχεία κυρίου του έργου", []) or []
+        cov = data.get("Στοιχεία Διαγράμματος Κάλυψης", {}) or {}
+        floors = (cov.get("ΣΥΝΟΛΟ", {}) or {}).get("Αριθμός Ορόφων")
+        parking = (cov.get("ΣΥΝΟΛΟ", {}) or {}).get("Αριθμός Θέσεων Στάθμευσης")
+        meta = data.get("_meta", {}) or {}
         return {
             "stem": stem,
             "pdf": str(pdf_path),
@@ -91,10 +101,12 @@ def _extract_one(pdf_path: Path, struct_dir: Path, resume: bool) -> Dict[str, An
             "status": "skipped",
             "elapsed_sec": 0.0,
             "err": "",
-            "kaek_present": None,
-            "owners_count": None,
-            "floors_total": None,
-            "parking_total": None,
+            "kaek_present": 1 if (data.get("ΚΑΕΚ") or "").strip() else 0,
+            "owners_count": int(len(owners)) if owners is not None else None,
+            "floors_total": floors if isinstance(floors, (int, float)) else None,
+            "parking_total": parking if isinstance(parking, (int, float)) else None,
+            "has_tables": 1 if meta.get("has_tables") else 0,
+            "tables_count": int(meta.get("tables_count") or 0),
         }
     t0 = time.time()
     try:
@@ -118,6 +130,8 @@ def _extract_one(pdf_path: Path, struct_dir: Path, resume: bool) -> Dict[str, An
             "owners_count": int(len(owners)),
             "floors_total": floors if isinstance(floors, (int, float)) else None,
             "parking_total": parking if isinstance(parking, (int, float)) else None,
+            "has_tables": 1 if meta.get("has_tables") else 0,
+            "tables_count": int(meta.get("tables_count") or 0),
         }
     except Exception as e:  # pragma: no cover
         elapsed = round(time.time() - t0, 3)
@@ -152,6 +166,8 @@ def write_manifest(manifest_csv: Path, rows: List[Dict[str, Any]]) -> None:
         "owners_count",
         "floors_total",
         "parking_total",
+    "has_tables",
+    "tables_count",
     ]
     with manifest_csv.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=headers)
