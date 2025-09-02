@@ -2,6 +2,8 @@
 
 Pipeline for extracting PDF permits with `docling`, normalizing structured data (KAEK, Owners, Coverage metrics), and benchmarking against a curated ground-truth CSV with JSON + Excel reporting.
 
+See also: documentation of field-by-field parsing in `EXTRACTION_LOGIC.md`.
+
 ## 1. Features Overview
 * Raw text comparison script retained (timings, similarity, basic text stats)
 * Robust KAEK extraction with tolerance for fragmented `/0/0` suffix & leading-zero equivalence
@@ -17,6 +19,7 @@ Pipeline for extracting PDF permits with `docling`, normalizing structured data 
 | `build_structured_json.py` | Parse raw text to canonical JSON (docling-only). |
 | `benchmark_evaluation.py` | Compute accuracy metrics vs ground-truth CSV. |
 | `build_excel_comparison.py` | Generate multi-sheet Excel for manual QA. |
+| `tools/debug_side_by_side.py` | Generate per-stem PDF vs extracted-text debug pages with diffs. |
 | `data/01_benchmark/eadeies_final.csv` | Ground truth (KAEK, owners, coverage). |
 | `debug/compare/` | Generated raw text & pairwise comparison JSON. (Git-ignored) |
 | `debug/structured_json/` | Structured JSON outputs. (Git-ignored) |
@@ -30,8 +33,8 @@ python -m venv .venv
 source .venv/bin/activate  # macOS/Linux
 pip install --upgrade pip
 pip install -r requirements.txt
-# Install docling (Python >=3.10 recommended)
-pip install docling
+# (Optional) Alternatively, run the helper initializer:
+# python tools/init_project.py
 ```
 
 ## 4. End-to-End Workflow
@@ -92,19 +95,22 @@ data = extract_pdf_to_structured(Path("data/Mike/<stem>.pdf"), extractor="doclin
 print(data["ΚΑΕΚ"], len(data["Στοιχεία κυρίου του έργου"]))
 ```
 
-### 4.3 End-to-end runner (optional)
-Run everything (text -> structured -> benchmark -> eye dashboard) in one command:
+### 4.3 Monthly batch runner (recommended)
+Run the parallel, resumable month runner that writes per-file JSON, a manifest, and a GT-like CSV:
 ```bash
-python tools/run_all.py \
-	--pdf-root data \
-	--gt data/01_benchmark/eadeies_final.csv \
-	--engines docling \
-	--out-dir debug
+python tools/run_month.py \
+	--input-dir data/2025/02 \
+	--out-root debug/runs \
+	--workers 8 \
+	--resume \
+	--yes
 ```
-This will:
-- build structured JSONs to `debug/structured_json/`
-- write `debug/benchmark_report.json`
-- render `debug/eye_dashboard.html`
+Outputs under `debug/runs/<MM>/`:
+- `structured_json/*.json` (one per PDF)
+- `manifest.csv` (file list with status)
+- `run_<MM>_<timestamp>.csv` (wide, GT-like CSV)
+
+Resume behavior: if `--resume` is set, existing JSONs in the same run folder are skipped.
 
 ## 5. Structured JSON Schema
 Each `<stem>_<extractor>_structured.json`:
@@ -176,3 +182,5 @@ Add a LICENSE file if this will be shared externally.
 
 ---
 Feel free to adapt/extend. Open an issue or PR for enhancements.
+
+See also: `CHAT_HISTORY.md` for a concise log of design decisions and operational tips.

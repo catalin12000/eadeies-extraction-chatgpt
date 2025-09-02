@@ -1,12 +1,15 @@
 # Extraction & Parsing Logic Overview
 
-This document explains how each component of the pipeline derives structured data from raw PDF permits for both `pdfplumber` and `docling` extractors.
+This document explains how the pipeline derives structured data from raw PDF permits. Structured JSON parsing is docling-only; pdfplumber is used only in the optional raw-text comparison script.
+
+Note (recent updates):
+- Parking parsing is now label-first. If the "Αριθμός Θέσεων Στάθμευσης" row label is missing or its ΣΥΝΟΛΟ is None/0 due to a page break, we detect an orphan numeric-only row immediately after "Αριθμός Ορόφων" and use it as Parking. As a last resort, we sniff the text around the Parking label to recover the ΣΥΝΟΛΟ.
 
 ## 1. Raw Text Acquisition
-- `compare_pdf_extractors.py` loads each PDF with:
-  - `pdfplumber`: concatenates page texts, normalizes hyphenated line breaks, collapses whitespace.
-  - `docling` (optional): converts to an internal document model and exports plain text.
-- Outputs (when `--save-text`): `debug/compare/<stem>_pdfplumber.txt` & `<stem>_docling.txt`.
+- `compare_pdf_extractors.py` can load each PDF with:
+  - `docling` (primary): converts to an internal document model and exports plain text.
+  - `pdfplumber` (optional, for comparison only): concatenates page texts, normalizes hyphenated line breaks, collapses whitespace.
+- Outputs (when `--save-text`): `debug/compare/<stem>_docling.txt` (and `<stem>_pdfplumber.txt` if enabled).
 
 ## 2. KAEK Extraction
 Goal: robustly identify the cadastral code `ΚΑΕΚ` which may appear in plain text or table form, sometimes fragmented.
@@ -64,6 +67,12 @@ Metrics:
 - Iterates markdown tables; any row with first cell matching a coverage key and exactly 5 columns (`[key, col1, col2, col3, col4]`) becomes a data row.
 - Skips header-like rows if the second cell contains group labels instead of numbers.
 
+#### Parking row recovery and priority
+Some PDFs split the Parking label across a page break, leaving only the numbers row. The parser applies these rules in order:
+1) Label-first: if a row labeled `Αριθμός Θέσεων Στάθμευσης` is present, take its values.
+2) Orphan numeric row: if the label is missing or its ΣΥΝΟΛΟ is `None`/`0`, detect a 4-number row immediately after `Αριθμός Ορόφων` (possibly as a tiny one-row table) and use those four numbers as Parking.
+3) Text fallback: if ΣΥΝΟΛΟ is still missing, search near the Parking label in the raw text for `ΣΥΝΟΛΟ` followed by an integer and set only the ΣΥΝΟΛΟ column.
+
 ### Orientation (`orient_coverage`):
 - Builds nested dict: `{ group: { metric: value } }` mapping columns (ΥΦΙΣΤΑΜΕΝΑ, ΝΟΜΙΜΟΠΟΙΟΥΜΕΝΑ, ΠΡΑΓΜΑΤΟΠΟΙΟΥΜΕΝΑ, ΣΥΝΟΛΟ).
 - Missing or `None` values filled with `0.0` for consistency.
@@ -96,6 +105,10 @@ Heuristics to disambiguate European formatted numbers:
 | Leading zero dropped in GT | Tolerated in `equivalent_kaek`. |
 | Ambiguous thousands vs decimal | Heuristics; potential refinement to treat pattern `^\d\.\d{3}$` as decimal if domain constraints justify. |
 | Negative coverage values lost | Regex includes optional `-`; extend similarly for docling if needed. |
+
+## 7.1 Debugging aids
+- `tools/debug_side_by_side.py` creates per-stem pages with: embedded PDF, extracted text, summary matches, “Not recognized items,” and detailed coverage diffs in `debug/case_debug/<stem>/index.html`.
+- `build_eye_dashboard.py` renders a single-page dashboard comparing GT vs extracted values across stems with quick diffs and optional embedded PDFs.
 
 ## 8. Potential Refinements
 - Context-aware magnitude checks (e.g., building volume rarely < 10, so `1.834` might be decimal while area metrics rarely use 4-digit decimals).

@@ -1,16 +1,17 @@
-# Core dependencies (docling requires pydantic v2)
+## Runtime
+# Document parsing (requires pydantic v2 under the hood)
+docling
 pydantic>=2.6,<3
-python-dotenv==1.0.1
-openai==0.28.1
 
-# Excel export
-openpyxl==3.1.2
-
-# Docling (install separately if needed): pip install docling
-# Note: ensure pydantic v2 is installed (pinned above). Some environments may show urllib3/OpenSSL warnings; they are non-fatal.
-
-# Utilities
+# Progress bar
 tqdm==4.66.4
 
-# Testing
+# Excel tools used by auxiliary scripts (keep installed)
+openpyxl>=3.1.5,<4
+
+## Dev/Test
 pytest==8.2.2
+
+## Notes
+# - Python 3.9+ supported here. If you see urllib3/OpenSSL warnings on macOS (LibreSSL), they are cosmetic.
+# - For GPU acceleration where supported, install a CUDA-enabled PyTorch in the same venv (optional).

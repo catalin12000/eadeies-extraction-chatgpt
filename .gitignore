@@ -22,6 +22,11 @@ __pycache__/
 # Debug & generated artifacts
 debug/
 !debug/README.md
+!debug/runs/**/manifest.csv
+!debug/runs/**/*.csv
+# keep directory shells
+!debug/runs/
+!debug/runs/**/
 
 # Data (raw PDFs etc.)
 data/**
